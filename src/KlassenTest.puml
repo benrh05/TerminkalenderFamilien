@@ -1,0 +1,91 @@
+@startuml
+hide circle
+skinparam classAttributeIconSize 0
+
+class Main{
+  +startDatenbank()
+  +übertrageDaten()
+  +startGUI()
+  +startLogik()
+}
+
+class Datenbank{
+  +erzeugtDatenbank()
+  +abfragen()
+}
+
+class GUI{
+  +alle Gui Elemente
+  ---
+  +ansichtAendern()
+  +benutzerWechseln()
+  +kalenderWechseln()
+}
+
+class Logik{
+  +erzeugeBenutzer()
+  +erzeugeTermine()
+}
+
+class Familie{
+  +name: String
+  +Benutzer: List<Benutzer>
+  --
+  +benutzerHinzufuegen()
+  +benutzerLoeschen()
+  +benutzernamenAendern()
+
+}
+class Benutzer {
+  +benutzerID: int
+  +name: String
+  +email: String
+  +rolle: String
+  +passwort: String
+  --
+  +benutzernamenAendern()
+  +benutzerBerechtigungenAendern()
+}
+
+class Kalender {
+  +kalenderID: int
+  +termine: List<Termine>
+  +kategorien: List<Kategorie>
+  --
+  +terminHinzufuegen()
+  +kategorieHinzufuegen()
+  +termineSuchen()
+}
+
+class Termin {
+  +terminID: int
+  +titel: String
+  +beschreibung: String
+  +start: DateTime
+  +ende: DateTime
+  +kategorie: Kategorie
+  --
+  +terminBearbeiten()
+  +terminLoeschen()
+  +terminKategorisieren()
+}
+
+class Kategorie {
+  +kategorieID: int
+  +name: String
+  +farbe: String
+}
+
+
+Benutzer "1" -- "1" Kalender : besitzt >
+Kalender "1" -- "0.." Termin : enthält >
+Termin "0.." --> "0..1" Kategorie : hat >
+Familie "1" -- "1..*" Benutzer : hat >
+Main --> "1" Logik : erzeugt >
+Main --> "1" GUI : erzeugt >
+Main --> "1" Datenbank : erzeugt >
+Logik  "1" -- "1" Datenbank : schreibt auf / liest von
+GUI "0..*" <--> Logik : gibt Input / verändert
+Logik "0..*" --> Benutzer : erzeugt / ändert / löscht >
+Logik "0..*" --> Termin : erzeugt / ändert / löscht >
+@enduml
