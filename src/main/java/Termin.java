@@ -56,6 +56,13 @@ public class Termin {
     }
 
     public void setBeschreibung(String beschreibung) {
+        this.beschreibung = beschreibung;
     }
+
+    public void setKategorie(Kategorie kategorie) {
+        this.kategorie = kategorie;
+    }
+
+
 }
 

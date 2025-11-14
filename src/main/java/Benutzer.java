@@ -56,4 +56,7 @@ public class Benutzer {
     public void setRolle(String rolle) {
         this.rolle = rolle;
     }
+
+
 }
+
