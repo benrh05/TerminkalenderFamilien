@@ -1,3 +1,5 @@
+package JavaLogik;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,7 +35,7 @@ public class Familie {
 
     public boolean erstelleBenutzer(String name, String email, String password, String rolle) {
         if (benutzernameExistiert(name)) {
-            GUI.fehlermeldungAnzeigen(); // muss noch in gui geschrieben werden
+            //GUI.fehlermeldungAnzeigen();  muss noch in gui geschrieben werden
             return false; // Name existiert bereits
         }
         Benutzer benutzer = new Benutzer(name, email, password, rolle);
@@ -55,7 +57,7 @@ public class Familie {
 
     public boolean benutzerBearbeiten(Benutzer benutzer, String neuerName, String neueEmail, String neuesPasswort, String neueRolle) {
         if (benutzernameExistiert(neuerName)) {
-            GUI.fehlermeldungAnzeigen(); // muss noch in gui geschrieben werden
+            //GUI.fehlermeldungAnzeigen();  muss noch in gui geschrieben werden
             return false; // Name existiert bereits
         }
         benutzer.setName(neuerName);

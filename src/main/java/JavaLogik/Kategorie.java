@@ -1,3 +1,5 @@
+package JavaLogik;
+
 public class Kategorie {
 
     private static int nextId = 1;

@@ -1,3 +1,5 @@
+package JavaLogik;
+
 public class Benutzer {
 
     private static int nextId = 1;

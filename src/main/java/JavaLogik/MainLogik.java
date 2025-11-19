@@ -1,3 +1,5 @@
+package JavaLogik;
+
 import java.time.Instant;
 
 public class MainLogik {

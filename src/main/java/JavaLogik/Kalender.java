@@ -1,3 +1,5 @@
+package JavaLogik;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.ArrayList;
@@ -57,7 +59,7 @@ public class Kalender {
         return this.kategorien.contains(kategorie);
     }
 
-    public List<Termin> termineSuchen(String name) {   // sucht Termin nach Namen -- aber nur erster gefundener
+    public List<Termin> termineSuchen(String name) {   // sucht JavaLogik.Termin nach Namen -- aber nur erster gefundener
         List<Termin> gefundeneTermine = new ArrayList<>();
         for (Termin termin : termine) {
             if (termin.getTitel().equals(name)) {
@@ -65,7 +67,7 @@ public class Kalender {
             }
         }
         if (gefundeneTermine.isEmpty()) {
-            return null;    // falls kein Termin gefunden wurde -- vllt anders lösen
+            return null;    // falls kein JavaLogik.Termin gefunden wurde -- vllt anders lösen
         }
         return gefundeneTermine;
     }
@@ -74,11 +76,11 @@ public class Kalender {
         Termin termin = new Termin(titel, start, ende, beschreibung, kategorie);
         if (konflikt(termin)) {
             // fragen ob trotzdem hinzufügen
-            if (GUI.trotzdemhinzufuegen()) {   // Methode die eine Abfrage in der GUI darstellt -- und noch geschrieben werden muss
-                terminErstellenUndHinzufuegen(termin);  // wenn der Benutzer trotz Konflikt hinzufügen will
+            if (/*GUI.trotzdemhinzufuegen()*/true) {   // Methode die eine Abfrage in der GUI darstellt -- und noch geschrieben werden muss
+                terminErstellenUndHinzufuegen(termin);  // wenn der JavaLogik.Benutzer trotz Konflikt hinzufügen will
                 return true;
             } else {
-                return false; // Termin wird nicht hinzugefügt
+                return false; // JavaLogik.Termin wird nicht hinzugefügt
             }
         } else {
             terminErstellenUndHinzufuegen(termin);
@@ -89,8 +91,8 @@ public class Kalender {
     public boolean kategorieDoppelt(String name) {
         for (Kategorie kategorie : kategorien) {
             if (kategorie.getName().equals(name)) {
-                GUI.zeigeFehlermeldung("Kategorie existiert bereits!"); // Methode die eine Fehlermeldung in der GUI darstellt -- und noch geschrieben werden muss
-                return true; // Kategorie existiert bereits
+                //GUI.zeigeFehlermeldung("JavaLogik.Kategorie existiert bereits!");  Methode die eine Fehlermeldung in der GUI darstellt -- und noch geschrieben werden muss
+                return true; // JavaLogik.Kategorie existiert bereits
             }
         }
         return false;
@@ -110,8 +112,8 @@ public class Kalender {
     public boolean terminBearbeiten(Termin termin, String neuerTitel, Instant neuerStart, Instant neuesEnde, String neueBeschreibung, Kategorie neueKategorie) {
         if (konflikt(new Termin(neuerTitel, neuerStart, neuesEnde, neueBeschreibung, neueKategorie))) {
             // fragen ob trotzdem bearbeiten
-            if (!GUI.trotzdemBearbeiten()) {   // Methode die eine Abfrage in der GUI darstellt -- und noch geschrieben werden muss
-                return false; // Termin wird nicht bearbeitet
+            if (/*!GUI.trotzdemBearbeiten()*/true) {   // Methode die eine Abfrage in der GUI darstellt -- und noch geschrieben werden muss
+                return false; // JavaLogik.Termin wird nicht bearbeitet
             }
         }
         termin.setTitel(neuerTitel);
