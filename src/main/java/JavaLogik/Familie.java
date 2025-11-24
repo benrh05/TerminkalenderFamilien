@@ -67,5 +67,13 @@ public class Familie {
         return true;
     }
 
+    public List<String> getBenutzerNamen() {
+        List<String> namen = new ArrayList<>();
+        for (Benutzer benutzer : mitglieder) {
+            namen.add(benutzer.getName());
+        }
+        return namen;
+    }
+
 
 }

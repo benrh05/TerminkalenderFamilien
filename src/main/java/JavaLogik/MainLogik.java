@@ -1,21 +1,64 @@
 package JavaLogik;
 
-import java.time.Instant;
+import java.time.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainLogik {
 
-    public static void main(String[] args) {
-        // was auch immer hier reinkommt, denke mal gui start und so
+    // Einfacher zentraler Kalender für die Demo / App-Logik
+    private static final Kalender appKalender = new Kalender();
 
-        // testimplementierung der hauptfunktionen
-        Familie testFamilie = Familie.erstelleFamilie("testFamilie"); // Familienname muss aus der GUI kommen
-        testFamilie.erstelleBenutzer("Max Mustermann", "max.mustermann@gmail.com", "password123", "Admin"); // Benutzerinformationen müssen aus der GUI kommen
-        testFamilie.getMitglieder().get(0).getKalender().erstelleKategorie("Arbeit", "#FF5733"); // Kategorieninformationen müssen aus der GUI kommen
-        testFamilie.getMitglieder().get(0).getKalender().terminErstellenUndHinzufuegen("Meeting", Instant.parse("2024-07-01T10:00:00Z"), Instant.parse("2024-07-01T11:00:00Z"), "Projektbesprechung", testFamilie.getMitglieder().get(0).getKalender().getKategorien().get(0)); // Termininformationen müssen aus der GUI kommen
-        testFamilie.benutzerBearbeiten(testFamilie.getMitglieder().get(0), "Toni Mustermann", "toni.mustermann@gmail.com", "newpassword456", "User"); // Neue Benutzerinformationen müssen aus der GUI kommen
-        testFamilie.getMitglieder().get(0).getKalender().terminBearbeiten(testFamilie.getMitglieder().get(0).getKalender().getTermine().get(0), "Wichtiges Meeting", Instant.parse("2024-07-01T10:30:00Z"), Instant.parse("2024-07-01T11:30:00Z"), "Wichtige Projektbesprechung", testFamilie.getMitglieder().get(0).getKalender().getKategorien().get(0)); // Neue Termininformationen müssen aus der GUI kommenten
+    // Demo-Familie (für Benutzer-Liste)
+    private static final Familie demoFamilie = new Familie("DemoFamilie");
 
+    static {
+        // Beispieltermine: zwei Termine für "heute" und ein Termin an einem konkreten zukünftigen Datum
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate today = LocalDate.now();
+
+        LocalDate futureDate = LocalDate.of(2025, 11, 28); // <-- hier konkretes Datum eintragen
+
+        // Termin 1 - heute 09:00 - 10:30
+        Instant t1s = LocalDateTime.of(today, LocalTime.of(9, 0)).atZone(zone).toInstant();
+        Instant t1e = LocalDateTime.of(today, LocalTime.of(10, 30)).atZone(zone).toInstant();
+        appKalender.terminErstellenUndHinzufuegen(new Termin("Zahnarzt", t1s, t1e, "Kontrolle und Reinigung", null));
+
+        // Termin 2 - heute 14:00 - 15:00
+        Instant t2s = LocalDateTime.of(today, LocalTime.of(14, 0)).atZone(zone).toInstant();
+        Instant t2e = LocalDateTime.of(today, LocalTime.of(15, 0)).atZone(zone).toInstant();
+        appKalender.terminErstellenUndHinzufuegen(new Termin("Team-Meeting", t2s, t2e, "Sprint Planung, Raum A2", null));
+
+        // Termin 3 - konkretes Datum (z.B. 28.11.2025) 16:00 - 17:30
+        Instant t3s = LocalDateTime.of(futureDate, LocalTime.of(16, 0)).atZone(zone).toInstant();
+        Instant t3e = LocalDateTime.of(futureDate, LocalTime.of(17, 30)).atZone(zone).toInstant();
+        appKalender.terminErstellenUndHinzufuegen(new Termin("Yoga-Kurs", t3s, t3e, "Studio Zentrum", null));
+
+        // Demo-Benutzer in der Familie anlegen (kann später aus Persistenz geladen werden)
+        demoFamilie.erstelleBenutzer("Max Mustermann", "max@demo", "pass", "user");
+        demoFamilie.erstelleBenutzer("Anna Müller", "anna@demo", "pass", "user");
+        demoFamilie.erstelleBenutzer("Chris Beispiel", "chris@demo", "pass", "user");
     }
+
+    /**
+     * Liefert alle Termine, deren Startdatum im angegebenen LocalDate liegt.
+     * Gibt eine leere Liste zurück, falls keine Termine vorhanden sind.
+     */
+    public static List<Termin> getTermineForDate(LocalDate date) {
+        List<Termin> result = new ArrayList<>();
+        ZoneId zone = ZoneId.systemDefault();
+        for (Termin t : appKalender.getTermine()) {
+            LocalDate d = ZonedDateTime.ofInstant(t.getStart(), zone).toLocalDate();
+            if (d.equals(date)) {
+                result.add(t);
+            }
+        }
+        return result;
+    }
+
+    // Liefert die Benutzernamen aus der Demo-Familie (Wrapper)
+    public static List<String> getBenutzerNamen() {
+        return demoFamilie.getBenutzerNamen();
+    }
+
 }
-
-

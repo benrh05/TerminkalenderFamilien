@@ -18,7 +18,7 @@ public class Termin {
         this.start = start;
         this.ende = ende;
         this.beschreibung = beschreibung;
-        this.kategorie = kategorie;  // gerade nur eine JavaLogik.Kategorie pro JavaLogik.Termin - vllt. ändern
+        this.kategorie = kategorie;  // gerade nur eine Kategorie pro Termin - vllt. ändern
     }
 
     public int getId() {
