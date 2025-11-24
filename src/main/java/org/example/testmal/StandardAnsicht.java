@@ -1,3 +1,4 @@
+// java
 package org.example.testmal;
 
 import JavaLogik.Termin;
@@ -19,6 +20,7 @@ import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,6 +47,9 @@ public class StandardAnsicht extends Application {
 
     // aktueller Benutzer (anzeigen)
     private Label currentUserLabel;
+
+    // Label für aktuellen Monat (sichtbar in der Topbar, links vom Suchfeld)
+    private Label monthLabel;
 
     public static void main(String[] args) {
         launch(args);
@@ -146,6 +151,10 @@ public class StandardAnsicht extends Application {
         currentUserLabel.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         currentUserLabel.setPadding(new Insets(0, 6, 0, 0));
 
+        // Neuer: Monat-Label, links vom Suchfeld (Instanzfeld damit später aktualisierbar)
+        monthLabel = new Label(LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+        monthLabel.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 16px;");
+
         searchField.setStyle(
                 "-fx-background-radius: 8; -fx-border-radius: 8; -fx-background-color: #232324; " +
                         "-fx-border-color: rgba(255,255,255,0.07); -fx-padding: 8; -fx-text-fill: #F2F2F2;");
@@ -159,8 +168,8 @@ public class StandardAnsicht extends Application {
                 "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
                         "-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 6 8 6 8; -fx-text-fill: #F2F2F2;");
 
-        // Topbar jetzt mit currentUserLabel vor dem profileBtn
-        topBar.getChildren().addAll(topLeftSpacer, searchField, searchBtn, currentUserLabel, profileBtn, mtBtn);
+        // Topbar jetzt mit monthLabel vor dem searchField
+        topBar.getChildren().addAll(topLeftSpacer, monthLabel, searchField, searchBtn, currentUserLabel, profileBtn, mtBtn);
 
         // --- USER PANEL (ausklappbar unter "Benutzer wechseln") ---
         VBox userPanel = new VBox(6);
