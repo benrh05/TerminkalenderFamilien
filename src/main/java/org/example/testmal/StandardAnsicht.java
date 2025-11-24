@@ -24,13 +24,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * WICHTIG für AI-Refactoring (Copilot / JetBrains AI):
- * - Das UI-Layout und das Styling (Dark Mode, Grid, Hover-Effekte, Sidebar, Topbar) sollen erhalten bleiben.
- * - Bitte NUR die Java-Logik vereinfachen, ohne das visuelle Ergebnis zu verändern.
- * - Die Klasse darf ruhig "anfängerhaft" aussehen: einfache if/else, klare Felder, wenig Abstraktion.
- * - KEINE Layouts, Styles oder Nodes löschen, solange sie sichtbar fürs UI gebraucht werden.
- */
 public class StandardAnsicht extends Application {
 
     // Zustände und Haupt-Container als normale Instanzfelder
@@ -50,6 +43,12 @@ public class StandardAnsicht extends Application {
 
     // Label für aktuellen Monat (sichtbar in der Topbar, links vom Suchfeld)
     private Label monthLabel;
+
+    // Aktuell in der Monatsansicht dargestellter Monat (erster Tag des Monats)
+    private LocalDate currentMonth = LocalDate.now().withDayOfMonth(1);
+
+    // Grid als Instanzfeld damit es neu gerendert werden kann
+    private GridPane calendarGrid;
 
     public static void main(String[] args) {
         launch(args);
@@ -94,20 +93,16 @@ public class StandardAnsicht extends Application {
 
         // Neuer: + Button öffnet TerminAdd und fügt Termin über MainLogik hinzu
         addBtn.setOnAction(e -> {
-            // defaultDate: heute (kann angepasst werden)
             TerminAdd.show(primaryStageRef, LocalDate.now(), (Termin neu) -> {
-                // versuche Termin in zentrale MainLogik zu speichern
                 try {
-                    MainLogik.addTermin(neu); // erwartet, dass MainLogik eine addTermin-Methode bietet
+                    MainLogik.addTermin(neu);
                 } catch (Throwable ex) {
-                    // Falls MainLogik.addTermin nicht vorhanden ist, nur Log-Ausgabe (Test-Fall)
                     System.out.println("Konnte Termin nicht an MainLogik übergeben: " + ex.getMessage());
                 }
-
-                // Wenn gerade Tagesansicht sichtbar ist, neu laden damit der Termin sofort erscheint
                 if (isDayView) {
-                    // showDayView lädt Termine erneut aus MainLogik
                     showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
+                } else {
+                    renderCalendar(); // neu rendern falls Monatsansicht sichtbar
                 }
             });
         });
@@ -152,7 +147,7 @@ public class StandardAnsicht extends Application {
         currentUserLabel.setPadding(new Insets(0, 6, 0, 0));
 
         // Neuer: Monat-Label, links vom Suchfeld (Instanzfeld damit später aktualisierbar)
-        monthLabel = new Label(LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+        monthLabel = new Label(currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
         monthLabel.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 16px;");
 
         searchField.setStyle(
@@ -179,13 +174,11 @@ public class StandardAnsicht extends Application {
         userPanel.setManaged(false);
         userPanel.setMaxWidth(Double.MAX_VALUE);
 
-        // Befülle Panel mit Benutzern aus MainLogik (Familie.getBenutzerNamen())
         List<String> users = MainLogik.getBenutzerNamen();
         for (String u : users) {
             Button ub = new Button(u);
             ub.setPrefWidth(Double.MAX_VALUE);
             ub.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-            // Hover
             ub.setOnMouseEntered(ev -> {
                 ub.setCursor(Cursor.HAND);
                 ub.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
@@ -195,14 +188,13 @@ public class StandardAnsicht extends Application {
                 ub.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
             });
             ub.setOnAction(ev -> {
-                currentUserLabel.setText(u);      // setze aktuellen Benutzer
-                userPanel.setVisible(false);     // Panel zuklappen
+                currentUserLabel.setText(u);
+                userPanel.setVisible(false);
                 userPanel.setManaged(false);
             });
             userPanel.getChildren().add(ub);
         }
 
-        // Füge userPanel direkt unter dem benutzerWechselnBtn in der leftBar ein
         int insertIndex = leftBar.getChildren().indexOf(benutzerWechselnBtn);
         if (insertIndex >= 0) {
             leftBar.getChildren().add(insertIndex + 1, userPanel);
@@ -210,7 +202,6 @@ public class StandardAnsicht extends Application {
             leftBar.getChildren().add(userPanel);
         }
 
-        // Toggle-Logik für den Button
         benutzerWechselnBtn.setOnAction(e -> {
             boolean showing = userPanel.isVisible();
             userPanel.setVisible(!showing);
@@ -225,13 +216,11 @@ public class StandardAnsicht extends Application {
         categoryPanel.setManaged(false);
         categoryPanel.setMaxWidth(Double.MAX_VALUE);
 
-        // Befülle Panel mit Kategorienamen aus MainLogik (Wrapper)
         List<String> kategorien = MainLogik.getKategorienNamen();
         for (String k : kategorien) {
             Button kb = new Button(k);
             kb.setPrefWidth(Double.MAX_VALUE);
             kb.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-            // Hover
             kb.setOnMouseEntered(ev -> {
                 kb.setCursor(Cursor.HAND);
                 kb.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
@@ -241,16 +230,13 @@ public class StandardAnsicht extends Application {
                 kb.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
             });
             kb.setOnAction(ev -> {
-                // Setze Button-Text auf die gewählte Kategorie und klappe zu
                 kategorienBtn.setText(k + " \u25BE");
                 categoryPanel.setVisible(false);
                 categoryPanel.setManaged(false);
-                // optional: hier Filter-Logik einbauen (z.B. Anzeige von Terminen nach Kategorie)
             });
             categoryPanel.getChildren().add(kb);
         }
 
-        // Füge categoryPanel direkt unter dem kategorienBtn in der leftBar ein
         int catInsertIndex = leftBar.getChildren().indexOf(kategorienBtn);
         if (catInsertIndex >= 0) {
             leftBar.getChildren().add(catInsertIndex + 1, categoryPanel);
@@ -258,7 +244,6 @@ public class StandardAnsicht extends Application {
             leftBar.getChildren().add(categoryPanel);
         }
 
-        // Toggle-Logik für den Kategorien-Button
         kategorienBtn.setOnAction(e -> {
             boolean showing = categoryPanel.isVisible();
             categoryPanel.setVisible(!showing);
@@ -266,7 +251,7 @@ public class StandardAnsicht extends Application {
         });
 
         // --- CENTER: CALENDAR GRID (Monatsansicht) ---
-        GridPane calendarGrid = new GridPane();
+        calendarGrid = new GridPane();
         calendarGrid.setPadding(new Insets(8, 18, 8, 18));
         calendarGrid.setHgap(6);
         calendarGrid.setVgap(8);
@@ -309,51 +294,7 @@ public class StandardAnsicht extends Application {
             headerGrid.add(d, i, 0);
         }
 
-        final String cellBaseStyle =
-                "-fx-background-color: #222225; -fx-background-radius: 10; -fx-border-radius: 10; " +
-                        "-fx-border-color: rgba(255,255,255,0.06); -fx-border-width: 1;";
-
-        for (int row = 0; row < 5; row++) {
-            for (int col = 0; col < 7; col++) {
-                StackPane cell = new StackPane();
-                cell.setMinHeight(100);
-                cell.setStyle(cellBaseStyle);
-                cell.setEffect(new DropShadow(BlurType.GAUSSIAN, Color.rgb(0, 0, 0, 0.10),
-                        6, 0.15, 0, 2));
-                cell.setOnMouseEntered(e -> {
-                    cell.setCursor(Cursor.HAND);
-                    cell.setTranslateY(-4);
-                    cell.setStyle(cellBaseStyle + "-fx-border-color: rgba(255,255,255,0.10);");
-                });
-                cell.setOnMouseExited(e -> {
-                    cell.setCursor(Cursor.DEFAULT);
-                    cell.setTranslateY(0);
-                    cell.setStyle(cellBaseStyle);
-                });
-
-                Label dayNumber = new Label("");
-                int num = row * 7 + col + 1; // Nummerierung 1..35
-                if (num <= 35) {
-                    dayNumber.setText(String.valueOf(num));
-                }
-                StackPane.setAlignment(dayNumber, Pos.TOP_RIGHT);
-                dayNumber.setPadding(new Insets(6, 10, 0, 0));
-                dayNumber.setStyle("-fx-text-fill: #F5F5F5; -fx-font-size: 14px; -fx-font-weight: 600;");
-                cell.getChildren().add(dayNumber);
-
-                // Neuer Klick-Handler: öffnet die Tagesansicht für die entsprechende Zahl
-                final int dayNum = num; // benötigt für Lambda
-                cell.setOnMouseClicked(ev -> {
-                    // Erstelle ein Datum: erster Tag des aktuellen Monats + (dayNum - 1)
-                    // (Bei dayNum > Anzahl der Tage im Monat springt es in den nächsten Monat — später anpassbar)
-                    LocalDate firstOfMonth = LocalDate.now().withDayOfMonth(1);
-                    LocalDate date = firstOfMonth.plusDays(dayNum - 1);
-                    showDayView(date);
-                });
-
-                calendarGrid.add(cell, col, row);
-            }
-        }
+        renderCalendar(); // initial render
 
         VBox centerBox = new VBox(2);
         centerBox.getChildren().addAll(headerGrid, calendarGrid);
@@ -380,6 +321,24 @@ public class StandardAnsicht extends Application {
         applyHover(profileBtn);
         applyHover(mtBtn);
 
+        // Prev / Next Buttons: Monat in Monatsansicht, Tag in Tagesansicht
+        prevBtn.setOnAction(e -> {
+            if (isDayView) {
+                showDayView(currentDisplayedDate.minusDays(1));
+            } else {
+                currentMonth = currentMonth.minusMonths(1);
+                renderCalendar();
+            }
+        });
+        nextBtn.setOnAction(e -> {
+            if (isDayView) {
+                showDayView(currentDisplayedDate.plusDays(1));
+            } else {
+                currentMonth = currentMonth.plusMonths(1);
+                renderCalendar();
+            }
+        });
+
         // Toggle Monats- / Tagesansicht
         mtBtn.setOnAction(e -> {
             if (!isDayView) {
@@ -392,9 +351,74 @@ public class StandardAnsicht extends Application {
         });
     }
 
+    // Rendert die Monatsansicht basierend auf currentMonth
+    private void renderCalendar() {
+        calendarGrid.getChildren().clear();
+
+        int daysInMonth = currentMonth.lengthOfMonth();
+        LocalDate firstOfMonth = currentMonth;
+        int firstColumn = firstOfMonth.getDayOfWeek().getValue() - 1; // Monday=0 .. Sunday=6
+
+        final String cellBaseStyle =
+                "-fx-background-color: #222225; -fx-background-radius: 10; -fx-border-radius: 10; " +
+                        "-fx-border-color: rgba(255,255,255,0.06); -fx-border-width: 1;";
+
+        for (int row = 0; row < 5; row++) {
+            for (int col = 0; col < 7; col++) {
+                int cellIndex = row * 7 + col;
+                int dayNum = cellIndex - firstColumn + 1;
+
+                StackPane cell = new StackPane();
+                cell.setMinHeight(100);
+                cell.setStyle(cellBaseStyle);
+                cell.setEffect(new DropShadow(BlurType.GAUSSIAN, Color.rgb(0, 0, 0, 0.10),
+                        6, 0.15, 0, 2));
+                cell.setOnMouseEntered(e -> {
+                    cell.setCursor(Cursor.HAND);
+                    cell.setTranslateY(-4);
+                    cell.setStyle(cellBaseStyle + "-fx-border-color: rgba(255,255,255,0.10);");
+                });
+                cell.setOnMouseExited(e -> {
+                    cell.setCursor(Cursor.DEFAULT);
+                    cell.setTranslateY(0);
+                    cell.setStyle(cellBaseStyle);
+                });
+
+                Label dayNumber = new Label("");
+                if (dayNum >= 1 && dayNum <= daysInMonth) {
+                    dayNumber.setText(String.valueOf(dayNum));
+                }
+                StackPane.setAlignment(dayNumber, Pos.TOP_RIGHT);
+                dayNumber.setPadding(new Insets(6, 10, 0, 0));
+                dayNumber.setStyle("-fx-text-fill: #F5F5F5; -fx-font-size: 14px; -fx-font-weight: 600;");
+                cell.getChildren().add(dayNumber);
+
+                // Klick nur wenn gültiger Tag
+                final int dni = dayNum;
+                if (dayNum >= 1 && dayNum <= daysInMonth) {
+                    cell.setOnMouseClicked(ev -> {
+                        LocalDate date = currentMonth.withDayOfMonth(dni);
+                        showDayView(date);
+                    });
+                } else {
+                    // kein klick
+                    cell.setOnMouseClicked(null);
+                }
+
+                calendarGrid.add(cell, col, row);
+            }
+        }
+
+        // Update month label
+        monthLabel.setText(currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+    }
+
     private void showMonthView() {
         root.setCenter(monthViewHolder);
         isDayView = false;
+        // ensure month label shows the month being displayed
+        monthLabel.setText(currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+        renderCalendar();
     }
 
     /**
@@ -413,6 +437,9 @@ public class StandardAnsicht extends Application {
 
         root.setCenter(dayView);
         isDayView = true;
+
+        // setze monthLabel auf den Monat des aktuell angezeigten Tages
+        monthLabel.setText(date.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
     }
 
     private void applyHover(Button b) {
