@@ -66,9 +66,9 @@ public class Kalender {
                 gefundeneTermine.add(termin);
             }
         }
-        if (gefundeneTermine.isEmpty()) {
-            return null;    // falls kein JavaLogik.Termin gefunden wurde -- vllt anders lösen
-        }
+//        if (gefundeneTermine.isEmpty()) {
+//            return null;    // falls kein JavaLogik.Termin gefunden wurde -- vllt anders lösen
+//        }
         return gefundeneTermine;
     }
 

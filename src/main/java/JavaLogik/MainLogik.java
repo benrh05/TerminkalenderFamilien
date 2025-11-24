@@ -61,4 +61,7 @@ public class MainLogik {
         return demoFamilie.getBenutzerNamen();
     }
 
+    public static void addTermin(Termin t) {
+        appKalender.terminErstellenUndHinzufuegen(t);
+    }
 }

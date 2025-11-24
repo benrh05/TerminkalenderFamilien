@@ -37,6 +37,12 @@ public class StandardAnsicht extends Application {
     private DayView dayView;        // eine Tagesansicht
     private BorderPane root;        // Root-Layout
 
+    // Referenz auf das Primary Stage (wird in start() gesetzt)
+    private Stage primaryStageRef;
+
+    // aktuelles in der Tagesansicht angezeigtes Datum
+    private LocalDate currentDisplayedDate = LocalDate.now();
+
     // aktueller Benutzer (anzeigen)
     private Label currentUserLabel;
 
@@ -47,6 +53,9 @@ public class StandardAnsicht extends Application {
     @Override
     public void start(Stage primaryStage) {
 
+        // store primary stage reference
+        this.primaryStageRef = primaryStage;
+
         // Root
         root = new BorderPane();
         root.setStyle("-fx-background-color: linear-gradient(#1b1b1e 0%, #262629 100%);");
@@ -56,6 +65,7 @@ public class StandardAnsicht extends Application {
         // Zeige initialen leeren Tag (heute)
         dayView.setOnRequestBack(this::showMonthView);
         dayView.show(LocalDate.now(), new ArrayList<>());
+        this.currentDisplayedDate = LocalDate.now();
 
         // --- LEFT SIDEBAR ---
         VBox leftBar = new VBox(16);
@@ -77,13 +87,25 @@ public class StandardAnsicht extends Application {
         addBtn.setPrefSize(36, 28);
         nav.getChildren().addAll(prevBtn, nextBtn, addBtn);
 
-        // Beispiel-Dialog "fehlende Rechte"
-        addBtn.setOnAction(e -> FehlendeRechte.show(
-                primaryStage,
-                "Sie haben nicht die erforderlichen Berechtigungen, wechseln Sie Benutzer, oder bearbeiten Sie die Berechtigungen.",
-                () -> System.out.println("Schließen"),
-                () -> System.out.println("Benutzer wechseln")
-        ));
+        // Neuer: + Button öffnet TerminAdd und fügt Termin über MainLogik hinzu
+        addBtn.setOnAction(e -> {
+            // defaultDate: heute (kann angepasst werden)
+            TerminAdd.show(primaryStageRef, LocalDate.now(), (Termin neu) -> {
+                // versuche Termin in zentrale MainLogik zu speichern
+                try {
+                    MainLogik.addTermin(neu); // erwartet, dass MainLogik eine addTermin-Methode bietet
+                } catch (Throwable ex) {
+                    // Falls MainLogik.addTermin nicht vorhanden ist, nur Log-Ausgabe (Test-Fall)
+                    System.out.println("Konnte Termin nicht an MainLogik übergeben: " + ex.getMessage());
+                }
+
+                // Wenn gerade Tagesansicht sichtbar ist, neu laden damit der Termin sofort erscheint
+                if (isDayView) {
+                    // showDayView lädt Termine erneut aus MainLogik
+                    showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
+                }
+            });
+        });
 
         Button kategorienBtn = new Button("Kategorien \u25BE"); // dropdown arrow
         kategorienBtn.setPrefWidth(Double.MAX_VALUE);
@@ -323,6 +345,9 @@ public class StandardAnsicht extends Application {
      * Termine werden nicht mehr hier erzeugt, sondern aus MainLogik geholt.
      */
     private void showDayView(LocalDate date) {
+        // merke aktuell angezeigtes Datum
+        this.currentDisplayedDate = date;
+
         // Termine vom zentralen MainLogik/Kalender holen
         List<Termin> termine = MainLogik.getTermineForDate(date);
 
