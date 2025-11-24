@@ -34,31 +34,34 @@ public class MainLogik {
         Instant t3e = LocalDateTime.of(futureDate, LocalTime.of(17, 30)).atZone(zone).toInstant();
         appKalender.terminErstellenUndHinzufuegen(new Termin("Yoga-Kurs", t3s, t3e, "Studio Zentrum", null));
 
+        // Demo-Kategorien anlegen (zwei Beispiele)
+        appKalender.erstelleKategorie("Privat", "#FF6B6B");
+        appKalender.erstelleKategorie("Arbeit", "#4A90E2");
+
         // Demo-Benutzer in der Familie anlegen (kann später aus Persistenz geladen werden)
         demoFamilie.erstelleBenutzer("Max Mustermann", "max@demo", "pass", "user");
         demoFamilie.erstelleBenutzer("Anna Müller", "anna@demo", "pass", "user");
         demoFamilie.erstelleBenutzer("Chris Beispiel", "chris@demo", "pass", "user");
     }
 
-    /**
-     * Liefert alle Termine, deren Startdatum im angegebenen LocalDate liegt.
-     * Gibt eine leere Liste zurück, falls keine Termine vorhanden sind.
-     */
+    // Liefert die Termine für ein bestimmtes Datum (Wrapper)    -- vllt später in Kalender verschieben und entfernen -- dozent findets gut so
     public static List<Termin> getTermineForDate(LocalDate date) {
-        List<Termin> result = new ArrayList<>();
-        ZoneId zone = ZoneId.systemDefault();
-        for (Termin t : appKalender.getTermine()) {
-            LocalDate d = ZonedDateTime.ofInstant(t.getStart(), zone).toLocalDate();
-            if (d.equals(date)) {
-                result.add(t);
-            }
-        }
-        return result;
+        return appKalender.getTermineForDate(date);
     }
 
-    // Liefert die Benutzernamen aus der Demo-Familie (Wrapper)
+    // Liefert die Benutzernamen aus der Demo-Familie (Wrapper)    -- vllt später in Familie verschieben und entfernen
     public static List<String> getBenutzerNamen() {
         return demoFamilie.getBenutzerNamen();
+    }
+
+    // Neuer Wrapper: Kategoriennamen aus dem Kalender
+    public static List<String> getKategorienNamen() {
+        return appKalender.getKategorienNamen();
+    }
+
+    // Neuer Wrapper: liefert Kategorie-Objekt anhand des Namens (oder null)
+    public static Kategorie getKategorieByName(String name) {
+        return appKalender.getKategorieByName(name);
     }
 
     public static void addTermin(Termin t) {

@@ -208,6 +208,54 @@ public class StandardAnsicht extends Application {
             userPanel.setManaged(!showing);
         });
 
+        // --- CATEGORY PANEL (ausklappbar unter "Kategorien") ---
+        VBox categoryPanel = new VBox(6);
+        categoryPanel.setPadding(new Insets(8));
+        categoryPanel.setStyle("-fx-background-color: #242428; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: rgba(255,255,255,0.03);");
+        categoryPanel.setVisible(false);
+        categoryPanel.setManaged(false);
+        categoryPanel.setMaxWidth(Double.MAX_VALUE);
+
+        // Befülle Panel mit Kategorienamen aus MainLogik (Wrapper)
+        List<String> kategorien = MainLogik.getKategorienNamen();
+        for (String k : kategorien) {
+            Button kb = new Button(k);
+            kb.setPrefWidth(Double.MAX_VALUE);
+            kb.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+            // Hover
+            kb.setOnMouseEntered(ev -> {
+                kb.setCursor(Cursor.HAND);
+                kb.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+            });
+            kb.setOnMouseExited(ev -> {
+                kb.setCursor(Cursor.DEFAULT);
+                kb.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+            });
+            kb.setOnAction(ev -> {
+                // Setze Button-Text auf die gewählte Kategorie und klappe zu
+                kategorienBtn.setText(k + " \u25BE");
+                categoryPanel.setVisible(false);
+                categoryPanel.setManaged(false);
+                // optional: hier Filter-Logik einbauen (z.B. Anzeige von Terminen nach Kategorie)
+            });
+            categoryPanel.getChildren().add(kb);
+        }
+
+        // Füge categoryPanel direkt unter dem kategorienBtn in der leftBar ein
+        int catInsertIndex = leftBar.getChildren().indexOf(kategorienBtn);
+        if (catInsertIndex >= 0) {
+            leftBar.getChildren().add(catInsertIndex + 1, categoryPanel);
+        } else {
+            leftBar.getChildren().add(categoryPanel);
+        }
+
+        // Toggle-Logik für den Kategorien-Button
+        kategorienBtn.setOnAction(e -> {
+            boolean showing = categoryPanel.isVisible();
+            categoryPanel.setVisible(!showing);
+            categoryPanel.setManaged(!showing);
+        });
+
         // --- CENTER: CALENDAR GRID (Monatsansicht) ---
         GridPane calendarGrid = new GridPane();
         calendarGrid.setPadding(new Insets(8, 18, 8, 18));

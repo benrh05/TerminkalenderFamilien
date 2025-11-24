@@ -1,6 +1,8 @@
 package org.example.testmal;
 
 import JavaLogik.Termin;
+import JavaLogik.Kategorie;
+import JavaLogik.MainLogik;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -51,10 +53,18 @@ public class TerminAdd extends Stage {
         beschreibung.setWrapText(true);
         beschreibung.setPrefRowCount(4);
 
-        // Kategorie als einfache String-Liste (falls Kategorie-API vorhanden, kann hier angepasst werden)
+        // Kategorie als ComboBox: fülle die Einträge aus MainLogik.getKategorienNamen()
         ComboBox<String> kategorieCb = new ComboBox<>();
         kategorieCb.setPromptText("Kategorie (optional)");
-        kategorieCb.getItems().addAll("Allgemein", "Arbeit", "Privat", "Wichtig");
+        try {
+            java.util.List<String> katNamen = MainLogik.getKategorienNamen();
+            if (katNamen != null && !katNamen.isEmpty()) {
+                kategorieCb.getItems().addAll(katNamen);
+            }
+        } catch (Throwable ex) {
+            // Fallback: keine Kategorien verfügbar -> leer lassen
+            System.out.println("Kategorien konnten nicht geladen werden: " + ex.getMessage());
+        }
 
         // Fehlermeldung
         Label errorLbl = new Label();
@@ -164,10 +174,15 @@ public class TerminAdd extends Stage {
             Instant iStart = zStart.toInstant();
             Instant iEnd = zEnd.toInstant();
             String beschr = beschreibung.getText();
-            // Kategorie-Objekt nicht verfügbar / API unknown -> übergebe null (kann später ersetzt werden)
-            Object selectedCat = kategorieCb.getValue();
-            // JavaLogik.Termin erwartet Kategorie als Typ; wir übergeben null, da Kategorie-Klasse nicht verändert werden soll.
-            Termin neu = new Termin(titel, iStart, iEnd, beschr, null);
+
+            // Ersetze bisher null-Übergabe: erzeuge Kategorie-Objekt via MainLogik-Wrapper
+            String selectedCatName = kategorieCb.getValue();
+            Kategorie chosenCat = null;
+            if (selectedCatName != null && !selectedCatName.isBlank()) {
+                chosenCat = MainLogik.getKategorieByName(selectedCatName);
+            }
+
+            Termin neu = new Termin(titel, iStart, iEnd, beschr, chosenCat);
 
             if (onSaved != null) {
                 onSaved.accept(neu);

@@ -3,6 +3,9 @@ package JavaLogik;
 import java.time.Instant;
 import java.util.List;
 import java.util.ArrayList;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 
 public class Kalender {
 
@@ -27,6 +30,14 @@ public class Kalender {
 
     public List<Kategorie> getKategorien() {
         return kategorien;
+    }
+
+    public List<String> getKategorienNamen() {
+        List<String> kategorienNamen = new ArrayList<>();
+        for (Kategorie kategorie : kategorien) {
+            kategorienNamen.add(kategorie.getName());
+        }
+        return kategorienNamen;
     }
 
     public void terminErstellenUndHinzufuegen(Termin termin) {
@@ -124,6 +135,29 @@ public class Kalender {
         return true;
         // Neue Termininformationen müssen aus der GUI kommen
     }
+
+    /**
+     * Liefert alle Termine, deren Startdatum im angegebenen LocalDate liegt.
+     * Kapselt die Termin-Suche innerhalb des Kalenders (früher in MainLogik).
+     */
+    public List<Termin> getTermineForDate(LocalDate date) {
+        List<Termin> result = new ArrayList<>();
+        ZoneId zone = ZoneId.systemDefault();
+        for (Termin t : this.termine) {
+            LocalDate d = ZonedDateTime.ofInstant(t.getStart(), zone).toLocalDate();
+            if (d.equals(date)) {
+                result.add(t);
+            }
+        }
+        return result;
+    }
+
+    // Neu: liefert die Kategorie-Instanz zum gegebenen Namen (oder null)
+    public Kategorie getKategorieByName(String name) {
+        if (name == null) return null;
+        for (Kategorie k : this.kategorien) {
+            if (name.equals(k.getName())) return k;
+        }
+        return null;
+    }
 }
-
-
