@@ -165,7 +165,7 @@ public class StandardAnsicht extends Application {
         mtBtn.setTooltip(new javafx.scene.control.Tooltip("Zwischen Monats- und Tagesansicht wechseln"));
 
         // Neuer: Label für aktuellen Benutzer (neben Profil-Icon)
-        currentUserLabel = new Label("Gast");
+        currentUserLabel = new Label(MainLogik.getCurrentUserName());
         currentUserLabel.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         currentUserLabel.setPadding(new Insets(0, 6, 0, 0));
 
@@ -211,9 +211,19 @@ public class StandardAnsicht extends Application {
                 ub.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
             });
             ub.setOnAction(ev -> {
+                // setze aktuellen Benutzer in MainLogik
+                MainLogik.setCurrentUserName(u);
+                // UI-Update
                 currentUserLabel.setText(u);
                 userPanel.setVisible(false);
                 userPanel.setManaged(false);
+                // neu rendern: Tagesansicht zeigt nun nur Termine des neuen Benutzers,
+                // Monatsansicht bleibt, ggf. mit anderen Terminen (falls dort dargestellt)
+                if (isDayView) {
+                    showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
+                } else {
+                    renderCalendar();
+                }
             });
             userPanel.getChildren().add(ub);
         }
