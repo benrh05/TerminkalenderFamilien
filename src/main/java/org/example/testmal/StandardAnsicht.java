@@ -24,6 +24,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+// zusätzliche Importe für die Uhr
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
+
 public class StandardAnsicht extends Application {
 
     // Zustände und Haupt-Container als normale Instanzfelder
@@ -44,11 +49,18 @@ public class StandardAnsicht extends Application {
     // Label für aktuellen Monat (sichtbar in der Topbar, links vom Suchfeld)
     private Label monthLabel;
 
+    // Neues: Label für aktuelles Datum+Uhrzeit und Timeline für die Aktualisierung
+    private Label dateTimeLabel;
+    private Timeline clockTimeline;
+
     // Aktuell in der Monatsansicht dargestellter Monat (erster Tag des Monats)
     private LocalDate currentMonth = LocalDate.now().withDayOfMonth(1);
 
     // Grid als Instanzfeld damit es neu gerendert werden kann
     private GridPane calendarGrid;
+
+    // Neues: mtBtn als Instanzfeld, damit andere Methoden die Beschriftung setzen können
+    private Button mtBtn;
 
     public static void main(String[] args) {
         launch(args);
@@ -77,9 +89,18 @@ public class StandardAnsicht extends Application {
         leftBar.setPrefWidth(220);
         leftBar.setStyle("-fx-background-color: transparent; -fx-border-width:0 1 0 0; -fx-border-color: rgba(0,0,0,0.04);");
 
-        Label dateLabel = new Label("Date/Time");
-        dateLabel.setFont(Font.font(18));
-        dateLabel.setStyle("-fx-text-fill: #E6E6E6;");
+        // dynamisches Datum + Uhrzeit (wird jede Sekunde aktualisiert)
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+        dateTimeLabel = new Label(LocalDateTime.now().format(dtf));
+        dateTimeLabel.setFont(Font.font(18));
+        dateTimeLabel.setStyle("-fx-text-fill: #E6E6E6;");
+
+        // Timeline aktualisiert die Anzeige jede Sekunde
+        clockTimeline = new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
+            dateTimeLabel.setText(LocalDateTime.now().format(dtf));
+        }));
+        clockTimeline.setCycleCount(Timeline.INDEFINITE);
+        clockTimeline.play();
 
         HBox nav = new HBox(8);
         nav.setAlignment(Pos.CENTER_LEFT);
@@ -111,7 +132,7 @@ public class StandardAnsicht extends Application {
         kategorienBtn.setPrefWidth(Double.MAX_VALUE);
         Button benutzerWechselnBtn = new Button("Benutzer wechseln \u21C5");
         benutzerWechselnBtn.setPrefWidth(Double.MAX_VALUE);
-        Button heuteBtn = new Button("Heute \u2B06");
+        Button heuteBtn = new Button("Aktueller Monat \u2B06");
         heuteBtn.setPrefWidth(Double.MAX_VALUE);
 
         String sideBtnStyle = "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
@@ -120,7 +141,7 @@ public class StandardAnsicht extends Application {
         benutzerWechselnBtn.setStyle(sideBtnStyle);
         heuteBtn.setStyle(sideBtnStyle);
 
-        leftBar.getChildren().addAll(dateLabel, nav, new Separator(), kategorienBtn, benutzerWechselnBtn, heuteBtn);
+        leftBar.getChildren().addAll(dateTimeLabel, nav, new Separator(), kategorienBtn, benutzerWechselnBtn, heuteBtn);
 
         // --- TOP BAR ---
         HBox topBar = new HBox(12);
@@ -137,7 +158,9 @@ public class StandardAnsicht extends Application {
         Button searchBtn = new Button("\uD83D\uDD0D"); // 🔍
         Button profileBtn = new Button("\uD83D\uDC64"); // 👤
         profileBtn.setPrefSize(44, 36);
-        Button mtBtn = new Button("M/T");
+
+        // Erstelle mtBtn als Instanz-Button (Text initial "Heute")
+        this.mtBtn = new Button("Heute");
         mtBtn.setPrefSize(54, 36);
         mtBtn.setTooltip(new javafx.scene.control.Tooltip("Zwischen Monats- und Tagesansicht wechseln"));
 
@@ -311,6 +334,11 @@ public class StandardAnsicht extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
 
+        // Timeline beim Schließen stoppen, damit kein Hintergrund-Thread weiterläuft
+        primaryStage.setOnCloseRequest(ev -> {
+            if (clockTimeline != null) clockTimeline.stop();
+        });
+
         applyHover(prevBtn);
         applyHover(nextBtn);
         applyHover(addBtn);
@@ -339,14 +367,22 @@ public class StandardAnsicht extends Application {
             }
         });
 
-        // Toggle Monats- / Tagesansicht
+        // Aktueller-Monat-Button: springt immer in die Monatsansicht des aktuellen Monats
+        heuteBtn.setOnAction(e -> {
+            currentMonth = LocalDate.now().withDayOfMonth(1);
+            showMonthView();
+        });
+
+        // mtBtn-Action: Wenn gerade die Tagesansicht DES HEUTIGEN DATUMS angezeigt wird -> zurück zur Monatsansicht.
+        // Ansonsten immer zur Tagesansicht von heute springen.
         mtBtn.setOnAction(e -> {
-            if (!isDayView) {
-                showDayView(LocalDate.now());
-                mtBtn.setText("T/M");
-            } else {
+            LocalDate today = LocalDate.now();
+            if (isDayView && currentDisplayedDate != null && currentDisplayedDate.equals(today)) {
+                // Wir sind bereits in der Tagesansicht von heute -> zurück zur Monatsansicht
                 showMonthView();
-                mtBtn.setText("M/T");
+            } else {
+                // In jedem anderen Fall -> zeige die Tagesansicht für HEUTE
+                showDayView(today);
             }
         });
     }
@@ -411,6 +447,8 @@ public class StandardAnsicht extends Application {
 
         // Update month label
         monthLabel.setText(currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+        // In Monatsansicht: mtBtn immer "Heute"
+        if (mtBtn != null) mtBtn.setText("Heute");
     }
 
     private void showMonthView() {
@@ -419,6 +457,8 @@ public class StandardAnsicht extends Application {
         // ensure month label shows the month being displayed
         monthLabel.setText(currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
         renderCalendar();
+        // In Monatsansicht: button soll "Heute" anzeigen (springt zur Tagesansicht von heute)
+        if (mtBtn != null) mtBtn.setText("Heute");
     }
 
     /**
@@ -440,6 +480,15 @@ public class StandardAnsicht extends Application {
 
         // setze monthLabel auf den Monat des aktuell angezeigten Tages
         monthLabel.setText(date.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+        // Wenn wir die Tagesansicht für HEUTE zeigen -> Button "Monat" (geht zur Monatsansicht).
+        // Ansonsten (Tagesansicht eines anderen Datums) -> Button "Heute" (springt zur Tagesansicht HEUTE).
+        if (mtBtn != null) {
+            if (date.equals(LocalDate.now())) {
+                mtBtn.setText("Monat");
+            } else {
+                mtBtn.setText("Heute");
+            }
+        }
     }
 
     private void applyHover(Button b) {

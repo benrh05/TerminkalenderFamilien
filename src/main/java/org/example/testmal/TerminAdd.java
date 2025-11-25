@@ -176,13 +176,13 @@ public class TerminAdd extends Stage {
             String beschr = beschreibung.getText();
 
             // Ersetze bisher null-Übergabe: erzeuge Kategorie-Objekt via MainLogik-Wrapper
-            String selectedCatName = kategorieCb.getValue();
-            Kategorie chosenCat = null;
-            if (selectedCatName != null && !selectedCatName.isBlank()) {
-                chosenCat = MainLogik.getKategorieByName(selectedCatName);
+            String selectedKatName = kategorieCb.getValue();
+            Kategorie chosenKat = null;
+            if (selectedKatName != null && !selectedKatName.isBlank()) {
+                chosenKat = MainLogik.getKategorieByName(selectedKatName);
             }
 
-            Termin neu = new Termin(titel, iStart, iEnd, beschr, chosenCat);
+            Termin neu = new Termin(titel, iStart, iEnd, beschr, chosenKat);
 
             if (onSaved != null) {
                 onSaved.accept(neu);
