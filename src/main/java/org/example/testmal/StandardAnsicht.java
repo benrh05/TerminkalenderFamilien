@@ -59,6 +59,9 @@ public class StandardAnsicht extends Application {
     // Grid als Instanzfeld damit es neu gerendert werden kann
     private GridPane calendarGrid;
 
+    // Neues: maximale Anzahl an kleinen Indikator-Punkten pro Tages-Kachel
+    private final int MAX_BADGES_ON_TILE = 3;
+
     // Neues: mtBtn als Instanzfeld, damit andere Methoden die Beschriftung setzen können
     private Button mtBtn;
 
@@ -438,6 +441,68 @@ public class StandardAnsicht extends Application {
                 dayNumber.setPadding(new Insets(6, 10, 0, 0));
                 dayNumber.setStyle("-fx-text-fill: #F5F5F5; -fx-font-size: 14px; -fx-font-weight: 600;");
                 cell.getChildren().add(dayNumber);
+
+                // ----- NEU: kleine Balken mit Titel, wenn an diesem Tag Termine vorhanden sind -----
+                if (dayNum >= 1 && dayNum <= daysInMonth) {
+                    LocalDate thisDate = currentMonth.withDayOfMonth(dayNum);
+                    // Hole Termine für den aktuell angemeldeten Benutzer an diesem Datum
+                    List<Termin> termine = MainLogik.getTermineForDate(thisDate);
+
+                    if (termine != null && !termine.isEmpty()) {
+                        VBox barsContainer = new VBox(6);
+                        // Platz unten und seitlich freihalten
+                        StackPane.setAlignment(barsContainer, Pos.BOTTOM_CENTER);
+                        // oben mehr Abstand, damit die Balken nicht in die Tageszahl ragen
+                        StackPane.setMargin(barsContainer, new Insets(32, 6, 8, 6)); // erhöhten Abstand oben
+                        // Damit die Bars die Breite der Kachel nutzen
+                        barsContainer.maxWidthProperty().bind(cell.widthProperty().subtract(12));
+
+                        int count = Math.min(termine.size(), MAX_BADGES_ON_TILE);
+                        for (int i = 0; i < count; i++) {
+                            Termin t = termine.get(i);
+                            HBox bar = new HBox();
+                            bar.setPrefHeight(16);
+                            bar.setMinHeight(16);
+                            bar.setMaxHeight(16);
+                            bar.maxWidthProperty().bind(cell.widthProperty().subtract(12));
+                            bar.setAlignment(Pos.CENTER_LEFT);
+
+                            String color = "#4A90E2"; // Default-Farbe
+                            try {
+                                if (t.getKategorie() != null && t.getKategorie().getFarbe() != null && !t.getKategorie().getFarbe().isBlank()) {
+                                    color = t.getKategorie().getFarbe();
+                                }
+                            } catch (Throwable ex) {
+                                // falls Termin keine Kategorie hat / Methode nicht verfügbar → Fallback-Farbe nutzen
+                            }
+
+                            bar.setStyle(
+                                "-fx-background-color: " + color + ";" +
+                                "-fx-background-radius: 6;" +
+                                "-fx-border-radius: 6;" +
+                                "-fx-border-color: rgba(0,0,0,0.12);"
+                            );
+
+                            Label tlabel = new Label(t.getTitel());
+                            tlabel.setStyle("-fx-text-fill: white; -fx-font-size: 11px;");
+                            tlabel.setPadding(new Insets(0, 8, 0, 8));
+                            bar.getChildren().add(tlabel);
+
+                            barsContainer.getChildren().add(bar);
+                        }
+
+                        // Wenn es mehr Termine gibt als angezeigt werden, ein kleines "…" unten links
+                        if (termine.size() > MAX_BADGES_ON_TILE) {
+                            Label more = new Label("…");
+                            more.setStyle("-fx-text-fill: #D0D0D0; -fx-font-size: 12px;");
+                            StackPane.setAlignment(more, Pos.BOTTOM_LEFT);
+                            StackPane.setMargin(more, new Insets(0, 0, 6, 8));
+                            cell.getChildren().add(more);
+                        }
+
+                        cell.getChildren().add(barsContainer);
+                    }
+                }
 
                 // Klick nur wenn gültiger Tag
                 final int dni = dayNum;

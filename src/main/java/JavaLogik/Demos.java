@@ -24,8 +24,9 @@ public class Demos {
         demoFamilie.erstelleBenutzer("Chris Beispiel", "chris@demo", "pass", "user");
 
         // Kategorien anlegen (zwei Beispiele) und JEDEM Benutzer-Kalender hinzufügen
-        Kategorie kPrivat = new Kategorie("Privat", "#FF6B6B");
-        Kategorie kArbeit = new Kategorie("Arbeit", "#4A90E2");
+        // weniger kräftige, matte Töne passend zum Dark-Theme
+        Kategorie kPrivat = new Kategorie("Privat", "#A85454");  // gedämpftes rostrot
+        Kategorie kArbeit = new Kategorie("Arbeit", "#6C8FA3");  // mattes blau-grau (unterscheidet sich von Standard)
 
         // Hilfswerte für Termine
         ZoneId zone = ZoneId.systemDefault();
