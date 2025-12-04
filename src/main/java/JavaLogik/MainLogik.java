@@ -3,6 +3,7 @@ package JavaLogik;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Instant; // ...neu
 
 public class MainLogik {
 
@@ -68,6 +69,21 @@ public class MainLogik {
             b.getKalender().terminErstellenUndHinzufuegen(t);
         } else {
             Demos.addTermin(t); // fallback
+        }
+    }
+
+    // --- NEU: Wrapper zum Bearbeiten eines Termins im Kalender des aktuellen Benutzers ---
+    public static boolean editTermin(Termin original, String neuerTitel, Instant neuerStart, Instant neuesEnde, String neueBeschreibung, Kategorie neueKategorie) {
+        try {
+            if (original == null) return false;
+            if (currentUserName == null) return false;
+            Benutzer b = Demos.getBenutzerByName(currentUserName);
+            if (b == null) return false;
+            // Kalender.terminBearbeiten führt die eigentliche Bearbeitung durch
+            return b.getKalender().terminBearbeiten(original, neuerTitel, neuerStart, neuesEnde, neueBeschreibung, neueKategorie);
+        } catch (Throwable ex) {
+            // bei Fehlern false zurückgeben
+            return false;
         }
     }
 }

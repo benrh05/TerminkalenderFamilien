@@ -1,6 +1,7 @@
 package org.example.testmal;
 
 import JavaLogik.Termin;
+import JavaLogik.MainLogik;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -9,6 +10,7 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.stage.Stage;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -250,6 +252,20 @@ public class DayView extends VBox {
                 block.setScaleX(1.0);
                 block.setScaleY(1.0);
                 block.setCursor(Cursor.DEFAULT);
+            });
+
+            // --- NEU: Klick öffnet Edit-Dialog für diesen Termin ---
+            block.setOnMouseClicked(ev -> {
+                if (getScene() == null || getScene().getWindow() == null) return;
+                Stage owner = (Stage) getScene().getWindow();
+                // Callback: bei erfolgreichem Speichern soll die DayView neu laden
+                java.util.function.Consumer<Termin> onSaved = (Termin ignored) -> {
+                    // lade aktuelle Termine erneut und render neu
+                    List<Termin> newList = MainLogik.getTermineForDate(this.currentDate);
+                    // show neu aufrufen (wird timeline neu aufbauen)
+                    this.show(this.currentDate, newList);
+                };
+                TerminAdd.show(owner, this.currentDate, t, onSaved);
             });
 
             eventLayer.getChildren().add(block);
