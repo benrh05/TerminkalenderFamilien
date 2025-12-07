@@ -191,15 +191,15 @@ public class TerminAdd extends Stage {
         });
     }
 
-    // Neue Überladung: Edit-Dialog für bestehenden Termin
+    // Neuer Konstruktor für das Editieren eines bestehenden Termins (Felder vorbefüllt)
     public TerminAdd(Stage owner, LocalDate defaultDate, Termin existing, Consumer<Termin> onSaved) {
         initOwner(owner);
         initModality(Modality.WINDOW_MODAL);
         initStyle(StageStyle.TRANSPARENT);
-        setTitle(existing != null ? "Termin bearbeiten" : "Neuen Termin erstellen");
+        setTitle("Termin bearbeiten");
 
         // --- Titel ---
-        Label title = new Label(existing != null ? "Termin bearbeiten" : "Neuen Termin anlegen");
+        Label title = new Label("Termin bearbeiten");
         title.setFont(Font.font(16));
         title.setStyle("-fx-text-fill: #F2F2F2; -fx-font-weight: 600;");
 
@@ -229,7 +229,6 @@ public class TerminAdd extends Stage {
                 kategorieCb.getItems().addAll(katNamen);
             }
         } catch (Throwable ex) {
-            // Fallback: keine Kategorien verfügbar -> leer lassen
             System.out.println("Kategorien konnten nicht geladen werden: " + ex.getMessage());
         }
 
@@ -237,31 +236,35 @@ public class TerminAdd extends Stage {
         Label errorLbl = new Label();
         errorLbl.setStyle("-fx-text-fill: #FF8888; -fx-font-size: 12px;");
 
-        // Wenn ein bestehender Termin übergeben wurde: Felder vorbefüllen
+        // Falls ein bestehender Termin übergeben wurde: Felder vorbefüllen
         if (existing != null) {
             try {
                 titelField.setText(existing.getTitel());
+            } catch (Throwable ignored) {}
+            try {
                 ZoneId zone = ZoneId.systemDefault();
-                Instant s = existing.getStart();
-                Instant e = existing.getEnde();
-                if (s != null) {
-                    ZonedDateTime zs = ZonedDateTime.ofInstant(s, zone);
-                    startDate.setValue(zs.toLocalDate());
-                    startTime.setText(String.format("%02d:%02d", zs.getHour(), zs.getMinute()));
-                }
-                if (e != null) {
-                    ZonedDateTime ze = ZonedDateTime.ofInstant(e, zone);
-                    endDate.setValue(ze.toLocalDate());
-                    endTime.setText(String.format("%02d:%02d", ze.getHour(), ze.getMinute()));
-                }
+                ZonedDateTime zs = ZonedDateTime.ofInstant(existing.getStart(), zone);
+                ZonedDateTime ze = ZonedDateTime.ofInstant(existing.getEnde(), zone);
+                startDate.setValue(zs.toLocalDate());
+                startTime.setText(String.format("%02d:%02d", zs.getHour(), zs.getMinute()));
+                endDate.setValue(ze.toLocalDate());
+                endTime.setText(String.format("%02d:%02d", ze.getHour(), ze.getMinute()));
+            } catch (Throwable ignored) {}
+            try {
                 if (existing.getBeschreibung() != null) beschreibung.setText(existing.getBeschreibung());
+            } catch (Throwable ignored) {}
+            try {
                 if (existing.getKategorie() != null && existing.getKategorie().getName() != null) {
-                    kategorieCb.setValue(existing.getKategorie().getName());
+                    String kn = existing.getKategorie().getName();
+                    if (kategorieCb.getItems().contains(kn)) {
+                        kategorieCb.setValue(kn);
+                    } else {
+                        // falls Kategorie-Name nicht in Liste ist, trotzdem anzeigen (optional)
+                        kategorieCb.getItems().add(kn);
+                        kategorieCb.setValue(kn);
+                    }
                 }
-            } catch (Throwable ex) {
-                // falls Vorbefüllung fehlschlägt, nichts tun (Dialog bleibt verwendbar)
-                System.out.println("Fehler beim Vorbefüllen: " + ex.getMessage());
-            }
+            } catch (Throwable ignored) {}
         }
 
         // Grid für Eingaben
@@ -331,6 +334,7 @@ public class TerminAdd extends Stage {
 
         cancelBtn.setOnAction(e -> close());
 
+        // Speichern: bei bestehendem Termin editTermin aufrufen
         saveBtn.setOnAction(e -> {
             errorLbl.setText("");
             String titel = titelField.getText() != null ? titelField.getText().trim() : "";
@@ -369,28 +373,26 @@ public class TerminAdd extends Stage {
             Instant iEnd = zEnd.toInstant();
             String beschr = beschreibung.getText();
 
-            // Ersetze bisher null-Übergabe: erzeuge Kategorie-Objekt via MainLogik-Wrapper
             String selectedKatName = kategorieCb.getValue();
             Kategorie chosenKat = null;
             if (selectedKatName != null && !selectedKatName.isBlank()) {
                 chosenKat = MainLogik.getKategorieByName(selectedKatName);
             }
 
+            // Wenn existing != null -> bearbeite vorhandenen Termin
             if (existing != null) {
-                // Editiere bestehenden Termin über MainLogik
                 boolean ok = MainLogik.editTermin(existing, titel, iStart, iEnd, beschr, chosenKat);
                 if (ok) {
                     if (onSaved != null) onSaved.accept(existing);
                     close();
                 } else {
-                    errorLbl.setText("Konnte Termin nicht aktualisieren.");
+                    errorLbl.setText("Konnte Termin nicht bearbeiten.");
                 }
                 return;
             }
 
-            // Verhalten unverändert: neuen Termin erzeugen und callback aufrufen
+            // Fallback (falls dieser Konstruktor trotzdem ohne existing benutzt wird): neues Verhalten wie bisher
             Termin neu = new Termin(titel, iStart, iEnd, beschr, chosenKat);
-
             if (onSaved != null) {
                 onSaved.accept(neu);
             }
@@ -398,13 +400,12 @@ public class TerminAdd extends Stage {
         });
     }
 
-    // Bestehende show(...) unverändert
     public static void show(Stage owner, LocalDate defaultDate, Consumer<Termin> onSaved) {
         TerminAdd d = new TerminAdd(owner, defaultDate, onSaved);
         d.showAndWait();
     }
 
-    // Neue statische Overload: zeigt Dialog zum Bearbeiten eines bestehenden Termins
+    // Neue statische Überladung: Show für bestehendes Termin (Edit)
     public static void show(Stage owner, LocalDate defaultDate, Termin existing, Consumer<Termin> onSaved) {
         TerminAdd d = new TerminAdd(owner, defaultDate, existing, onSaved);
         d.showAndWait();
