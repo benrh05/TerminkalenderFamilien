@@ -1,4 +1,7 @@
+```mermaid
+
 erDiagram
+    
     PERSON {
         int id PK
         string name
@@ -24,3 +27,4 @@ erDiagram
 
     PERSON ||--o{ TERMIN : "hat"
     KATEGORIE ||--o{ TERMIN : "wird_zugeordnet"
+```
