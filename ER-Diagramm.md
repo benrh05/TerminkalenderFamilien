@@ -25,6 +25,6 @@ erDiagram
         int kategorie_id FK
     }
 
-    PERSON ||--o{ TERMIN : "hat"
-    KATEGORIE ||--o{ TERMIN : "wird_zugeordnet"
+    PERSON { TERMIN : "hat"
+    KATEGORIE { TERMIN : "wird_zugeordnet"
 ```
