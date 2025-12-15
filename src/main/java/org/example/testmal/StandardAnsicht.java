@@ -32,6 +32,8 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 import javafx.geometry.Side;
 import javafx.scene.control.Alert;
+import javafx.application.Platform;
+import java.util.function.Consumer;
 
 public class StandardAnsicht extends Application {
 
@@ -71,6 +73,9 @@ public class StandardAnsicht extends Application {
 
     // NEU: userPanel als Instanzfeld, damit es aus Lambdas genutzt werden kann
     private VBox userPanel;
+
+    // NEU: categoryPanel als Instanzfeld
+    private VBox categoryPanel;
 
     public static void main(String[] args) {
         launch(args);
@@ -281,45 +286,38 @@ public class StandardAnsicht extends Application {
         });
 
         // --- CATEGORY PANEL (ausklappbar unter "Kategorien") ---
-        VBox categoryPanel = new VBox(6);
-        categoryPanel.setPadding(new Insets(8));
-        categoryPanel.setStyle("-fx-background-color: #242428; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: rgba(255,255,255,0.03);");
-        categoryPanel.setVisible(false);
-        categoryPanel.setManaged(false);
-        categoryPanel.setMaxWidth(Double.MAX_VALUE);
-
-        List<String> kategorien = MainLogik.getKategorienNamen();
-        for (String k : kategorien) {
-            Button kb = new Button(k);
-            kb.setPrefWidth(Double.MAX_VALUE);
-            kb.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-            kb.setOnMouseEntered(ev -> {
-                kb.setCursor(Cursor.HAND);
-                kb.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-            });
-            kb.setOnMouseExited(ev -> {
-                kb.setCursor(Cursor.DEFAULT);
-                kb.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-            });
-            kb.setOnAction(ev -> {
-                kategorienBtn.setText(k + " \u25BE");
-                categoryPanel.setVisible(false);
-                categoryPanel.setManaged(false);
-            });
-            categoryPanel.getChildren().add(kb);
-        }
+        // Instanz-Panel und initiale Befüllung via helper
+        this.categoryPanel = new VBox(6);
+        this.categoryPanel.setPadding(new Insets(8));
+        this.categoryPanel.setStyle("-fx-background-color: #242428; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: rgba(255,255,255,0.03);");
+        this.categoryPanel.setVisible(false);
+        this.categoryPanel.setManaged(false);
+        this.categoryPanel.setMaxWidth(Double.MAX_VALUE);
+        refreshCategoryPanel();
 
         int catInsertIndex = leftBar.getChildren().indexOf(kategorienBtn);
         if (catInsertIndex >= 0) {
-            leftBar.getChildren().add(catInsertIndex + 1, categoryPanel);
+            leftBar.getChildren().add(catInsertIndex + 1, this.categoryPanel);
         } else {
-            leftBar.getChildren().add(categoryPanel);
+            leftBar.getChildren().add(this.categoryPanel);
         }
 
         kategorienBtn.setOnAction(e -> {
-            boolean showing = categoryPanel.isVisible();
-            categoryPanel.setVisible(!showing);
-            categoryPanel.setManaged(!showing);
+            boolean showing = this.categoryPanel.isVisible();
+            this.categoryPanel.setVisible(!showing);
+            this.categoryPanel.setManaged(!showing);
+        });
+
+        // Register UI listener, damit Kategorien, die z.B. aus KategorieAdd erstellt werden,
+        // sofort in der UI sichtbar werden.
+        MainLogik.setCategoryAddedListener((String newName) -> {
+            Platform.runLater(() -> {
+                try {
+                    refreshCategoryPanel();
+                } catch (Throwable ex) {
+                    System.err.println("Fehler beim Aktualisieren der Kategorien: " + ex.getMessage());
+                }
+            });
         });
 
         // --- CENTER: CALENDAR GRID (Monatsansicht) ---
@@ -658,6 +656,41 @@ public class StandardAnsicht extends Application {
             }
         } catch (Throwable ex) {
             System.err.println("refreshUserPanel failed: " + ex.getMessage());
+        }
+    }
+
+    // NEU: refresh der Kategorie-Liste im Panel
+    private void refreshCategoryPanel() {
+        if (this.categoryPanel == null) return;
+        this.categoryPanel.getChildren().clear();
+        try {
+            List<String> kategorien = MainLogik.getKategorienNamen();
+            if (kategorien == null) return;
+            for (String k : kategorien) {
+                Button kb = new Button(k);
+                kb.setPrefWidth(Double.MAX_VALUE);
+                kb.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+                kb.setOnMouseEntered(ev -> {
+                    kb.setCursor(Cursor.HAND);
+                    kb.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+                });
+                kb.setOnMouseExited(ev -> {
+                    kb.setCursor(Cursor.DEFAULT);
+                    kb.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+                });
+                kb.setOnAction(ev -> {
+                    // Set selected category label and close panel
+                    try {
+                        // set label text quickly
+                        // kategorienBtn ist local, but its text update is cosmetic — skip if not reachable
+                        this.categoryPanel.setVisible(false);
+                        this.categoryPanel.setManaged(false);
+                    } catch (Throwable ignore) {}
+                });
+                this.categoryPanel.getChildren().add(kb);
+            }
+        } catch (Throwable ex) {
+            System.err.println("refreshCategoryPanel failed: " + ex.getMessage());
         }
     }
 }

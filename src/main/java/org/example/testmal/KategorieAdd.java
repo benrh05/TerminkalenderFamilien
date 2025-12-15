@@ -147,19 +147,9 @@ public class KategorieAdd extends Stage {
             return;
         }
 
-        // check duplicate via MainLogik (current user context)
-        try {
-            if (MainLogik.getKategorieByName(name) != null) {
-                errorLbl.setText("Kategorie existiert bereits.");
-                return;
-            }
-        } catch (Throwable ex) {
-            // ignore, let creation attempt fail later if necessary
-        }
-
+        // Check valid color
         String hex = colorHexField.getText() != null ? colorHexField.getText().trim() : toHex(colorPicker.getValue());
         if (!hex.startsWith("#")) hex = "#" + hex;
-        // simple normalization: ensure it's a valid color
         try {
             Color.web(hex);
         } catch (Exception ex) {
@@ -167,37 +157,25 @@ public class KategorieAdd extends Stage {
             return;
         }
 
-        // create and add to current user's calendar
+        // Verwende MainLogik, damit Kategorie zentral beim aktuellen Benutzer gespeichert wird
+        boolean ok = false;
         try {
-            String currentUser = MainLogik.getCurrentUserName();
-            if (currentUser == null) {
-                Alert a = new Alert(Alert.AlertType.ERROR, "Kein aktueller Benutzer angemeldet.");
-                a.initOwner(getOwner());
-                a.showAndWait();
-                return;
-            }
-            Benutzer b = MainLogik.getBenutzerByName(currentUser);
-            if (b == null) {
-                Alert a = new Alert(Alert.AlertType.ERROR, "Aktueller Benutzer nicht gefunden.");
-                a.initOwner(getOwner());
-                a.showAndWait();
-                return;
-            }
-
-            Kategorie k = new Kategorie(name, hex);
-            b.getKalender().kategorieHinzufuegen(k);
-
-            // Callback informieren
-            if (this.onCreated != null) {
-                try { this.onCreated.accept(name); } catch (Exception ignored) {}
-            }
-            close();
+            ok = MainLogik.createKategorie(name, hex);
         } catch (Throwable ex) {
-            System.err.println("Kategorie konnte nicht angelegt werden: " + ex.getMessage());
-            Alert a = new Alert(Alert.AlertType.ERROR, "Kategorie konnte nicht erstellt werden.");
-            a.initOwner(getOwner());
-            a.showAndWait();
+            System.err.println("Fehler beim Erstellen der Kategorie: " + ex.getMessage());
+            ok = false;
         }
+
+        if (!ok) {
+            errorLbl.setText("Kategorie konnte nicht angelegt werden (evtl. Name bereits vorhanden).");
+            return;
+        }
+
+        // Callback informieren (liefert Name)
+        if (this.onCreated != null) {
+            try { this.onCreated.accept(name); } catch (Exception ignored) {}
+        }
+        close();
     }
 
     private String toHex(Color c) {

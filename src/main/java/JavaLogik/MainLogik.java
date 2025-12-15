@@ -171,4 +171,31 @@ public class MainLogik {
             return false;
         }
     }
+
+    // Listener für UI, wird aufgerufen, wenn eine neue Kategorie erstellt wurde (liefert Namen)
+    private static java.util.function.Consumer<String> categoryAddedListener;
+
+    public static void setCategoryAddedListener(java.util.function.Consumer<String> listener) {
+        categoryAddedListener = listener;
+    }
+
+    // --- NEU: Wrapper zum Erstellen einer Kategorie für den aktuellen Benutzer ---
+    public static boolean createKategorie(String name, String farbe) {
+        if (name == null || name.isBlank() || currentUserName == null) return false;
+        try {
+            Benutzer b = Demos.getBenutzerByName(currentUserName);
+            if (b == null) return false;
+            boolean created = b.getKalender().erstelleKategorie(name.trim(), farbe == null ? "#4A90E2" : farbe.trim());
+            if (created) {
+                // Informiere registrierten Listener (UI) falls vorhanden
+                try {
+                    if (categoryAddedListener != null) categoryAddedListener.accept(name.trim());
+                } catch (Throwable ignore) {}
+            }
+            return created;
+        } catch (Throwable ex) {
+            System.err.println("createKategorie fehlgeschlagen: " + ex.getMessage());
+            return false;
+        }
+    }
 }
