@@ -77,6 +77,9 @@ public class StandardAnsicht extends Application {
     // NEU: categoryPanel als Instanzfeld
     private VBox categoryPanel;
 
+    // NEU: aktuell gewählte Kategorie (null = alle)
+    private String selectedCategoryName = null;
+
     public static void main(String[] args) {
         launch(args);
     }
@@ -476,13 +479,26 @@ public class StandardAnsicht extends Application {
                 dayNumber.setStyle("-fx-text-fill: #F5F5F5; -fx-font-size: 14px; -fx-font-weight: 600;");
                 cell.getChildren().add(dayNumber);
 
-                // ----- NEU: kleine Balken mit Titel, wenn an diesem Tag Termine vorhanden sind -----
+                // ----- Balken nur für Termine, die (falls gesetzt) zur selectedCategoryName gehören -----
                 if (dayNum >= 1 && dayNum <= daysInMonth) {
                     LocalDate thisDate = currentMonth.withDayOfMonth(dayNum);
-                    // Hole Termine für den aktuell angemeldeten Benutzer an diesem Datum
                     List<Termin> termine = MainLogik.getTermineForDate(thisDate);
+                    List<Termin> visibleTermine = new ArrayList<>();
+                    if (termine != null) {
+                        if (selectedCategoryName == null) {
+                            visibleTermine.addAll(termine);
+                        } else {
+                            for (Termin t : termine) {
+                                try {
+                                    if (t.getKategorie() != null && selectedCategoryName.equals(t.getKategorie().getName())) {
+                                        visibleTermine.add(t);
+                                    }
+                                } catch (Throwable ignore) {}
+                            }
+                        }
+                    }
 
-                    if (termine != null && !termine.isEmpty()) {
+                    if (visibleTermine != null && !visibleTermine.isEmpty()) {
                         VBox barsContainer = new VBox(6);
                         // Platz unten und seitlich freihalten
                         StackPane.setAlignment(barsContainer, Pos.BOTTOM_CENTER);
@@ -491,9 +507,9 @@ public class StandardAnsicht extends Application {
                         // Damit die Bars die Breite der Kachel nutzen
                         barsContainer.maxWidthProperty().bind(cell.widthProperty().subtract(12));
 
-                        int count = Math.min(termine.size(), MAX_BADGES_ON_TILE);
+                        int count = Math.min(visibleTermine.size(), MAX_BADGES_ON_TILE);
                         for (int i = 0; i < count; i++) {
-                            Termin t = termine.get(i);
+                            Termin t = visibleTermine.get(i);
                             HBox bar = new HBox();
                             bar.setPrefHeight(16);
                             bar.setMinHeight(16);
@@ -526,7 +542,7 @@ public class StandardAnsicht extends Application {
                         }
 
                         // Wenn es mehr Termine gibt als angezeigt werden, ein kleines "…" unten links
-                        if (termine.size() > MAX_BADGES_ON_TILE) {
+                        if (visibleTermine.size() > MAX_BADGES_ON_TILE) {
                             Label more = new Label("…");
                             more.setStyle("-fx-text-fill: #D0D0D0; -fx-font-size: 12px;");
                             StackPane.setAlignment(more, Pos.BOTTOM_LEFT);
@@ -575,22 +591,29 @@ public class StandardAnsicht extends Application {
      * Termine werden nicht mehr hier erzeugt, sondern aus MainLogik geholt.
      */
     private void showDayView(LocalDate date) {
-        // merke aktuell angezeigtes Datum
         this.currentDisplayedDate = date;
 
-        // Termine vom zentralen MainLogik/Kalender holen
         List<Termin> termine = MainLogik.getTermineForDate(date);
+        List<Termin> visible = new ArrayList<>();
+        if (termine != null) {
+            if (selectedCategoryName == null) {
+                visible.addAll(termine);
+            } else {
+                for (Termin t : termine) {
+                    try {
+                        if (t.getKategorie() != null && selectedCategoryName.equals(t.getKategorie().getName())) {
+                            visible.add(t);
+                        }
+                    } catch (Throwable ignore) {}
+                }
+            }
+        }
 
-        // Neue API: direkt anzeigen
-        dayView.show(date, termine);
-
+        dayView.show(date, visible);
         root.setCenter(dayView);
         isDayView = true;
 
-        // setze monthLabel auf den Monat des aktuell angezeigten Tages
         monthLabel.setText(date.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
-        // Wenn wir die Tagesansicht für HEUTE zeigen -> Button "Monat" (geht zur Monatsansicht).
-        // Ansonsten (Tagesansicht eines anderen Datums) -> Button "Heute" (springt zur Tagesansicht HEUTE).
         if (mtBtn != null) {
             if (date.equals(LocalDate.now())) {
                 mtBtn.setText("Monat");
@@ -659,11 +682,28 @@ public class StandardAnsicht extends Application {
         }
     }
 
-    // NEU: refresh der Kategorie-Liste im Panel
+    // NEU: refresh der Kategorie-Liste im Panel (angepasst: Auswahl setzt Filter)
     private void refreshCategoryPanel() {
         if (this.categoryPanel == null) return;
         this.categoryPanel.getChildren().clear();
         try {
+            // "Alle" Button - setzt Filter zurück
+            Button allBtn = new Button("Alle");
+            allBtn.setPrefWidth(Double.MAX_VALUE);
+            allBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+            allBtn.setOnAction(ev -> {
+                selectedCategoryName = null;
+                this.categoryPanel.setVisible(false);
+                this.categoryPanel.setManaged(false);
+                // neu rendern
+                if (isDayView) {
+                    showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
+                } else {
+                    renderCalendar();
+                }
+            });
+            this.categoryPanel.getChildren().add(allBtn);
+
             List<String> kategorien = MainLogik.getKategorienNamen();
             if (kategorien == null) return;
             for (String k : kategorien) {
@@ -676,17 +716,32 @@ public class StandardAnsicht extends Application {
                 });
                 kb.setOnMouseExited(ev -> {
                     kb.setCursor(Cursor.DEFAULT);
-                    kb.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+                    // restore selection style or base
+                    boolean sel = (selectedCategoryName != null && selectedCategoryName.equals(k));
+                    kb.setStyle(sel ? "-fx-background-color: rgba(75,123,255,0.18); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;" :
+                                      "-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
                 });
                 kb.setOnAction(ev -> {
-                    // Set selected category label and close panel
-                    try {
-                        // set label text quickly
-                        // kategorienBtn ist local, but its text update is cosmetic — skip if not reachable
-                        this.categoryPanel.setVisible(false);
-                        this.categoryPanel.setManaged(false);
-                    } catch (Throwable ignore) {}
+                    // Toggle selection: bei erneutem Klick entfernen
+                    if (k.equals(selectedCategoryName)) {
+                        selectedCategoryName = null;
+                    } else {
+                        selectedCategoryName = k;
+                    }
+                    this.categoryPanel.setVisible(false);
+                    this.categoryPanel.setManaged(false);
+
+                    // neu rendern mit Filter
+                    if (isDayView) {
+                        showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
+                    } else {
+                        renderCalendar();
+                    }
                 });
+                // visuelle Markierung, falls ausgewählt
+                if (selectedCategoryName != null && selectedCategoryName.equals(k)) {
+                    kb.setStyle("-fx-background-color: rgba(75,123,255,0.18); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+                }
                 this.categoryPanel.getChildren().add(kb);
             }
         } catch (Throwable ex) {
