@@ -163,21 +163,31 @@ public class TerminAdd extends Stage {
         grid.setVgap(8);
         grid.setPadding(new Insets(8, 0, 0, 0));
 
-        grid.add(new Label("Titel:"), 0, 0);
+        Label lblTitel = new Label("Titel:");
+        lblTitel.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
+        grid.add(lblTitel, 0, 0);
         grid.add(titelField, 1, 0, 2, 1);
 
-        grid.add(new Label("Start Datum:"), 0, 1);
+        Label lblStart = new Label("Start Datum:");
+        lblStart.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
+        grid.add(lblStart, 0, 1);
         grid.add(startDate, 1, 1);
         grid.add(startTime, 2, 1);
 
-        grid.add(new Label("Ende Datum:"), 0, 2);
+        Label lblEnde = new Label("Ende Datum:");
+        lblEnde.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
+        grid.add(lblEnde, 0, 2);
         grid.add(endDate, 1, 2);
         grid.add(endTime, 2, 2);
 
-        grid.add(new Label("Kategorie:"), 0, 3);
+        Label lblKat = new Label("Kategorie:");
+        lblKat.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
+        grid.add(lblKat, 0, 3);
         grid.add(kategorieCb, 1, 3, 2, 1);
 
-        grid.add(new Label("Beschreibung:"), 0, 4);
+        Label lblBesch = new Label("Beschreibung:");
+        lblBesch.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
+        grid.add(lblBesch, 0, 4);
         grid.add(beschreibung, 1, 4, 2, 1);
 
         grid.add(errorLbl, 0, 5, 3, 1);

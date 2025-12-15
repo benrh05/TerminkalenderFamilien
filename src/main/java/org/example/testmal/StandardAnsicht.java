@@ -139,9 +139,13 @@ public class StandardAnsicht extends Application {
                 });
             });
 
-            // vorerst keine Aktion – Platzhalter für späteren Benutzer-Workflow
             miBenutzer.setOnAction(ae -> {
-                // TODO: Benutzer hinzufügen (noch nicht implementiert)
+                // Öffnet die Benutzer-Add-Stage; der Callback kann später genutzt werden,
+                // um die UI (z.B. userPanel) zu aktualisieren, derzeit keine zusätzliche Aktion.
+                BenutzerAdd.show(primaryStageRef, (String neuName) -> {
+                    // optional: UI-Aktualisierung (z. B. Benutzerliste neu laden)
+                    // wird aktuell nicht durchgeführt, damit die Änderung minimal bleibt.
+                });
             });
 
             addMenu.getItems().addAll(miTermin, miBenutzer);
