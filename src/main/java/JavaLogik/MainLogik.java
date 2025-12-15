@@ -86,4 +86,19 @@ public class MainLogik {
             return false;
         }
     }
+
+    // --- NEU: Wrapper zum Löschen eines Termins im Kalender des aktuellen Benutzers ---
+    public static boolean deleteTermin(Termin t) {
+        if (t == null || currentUserName == null) return false;
+        try {
+            Benutzer b = Demos.getBenutzerByName(currentUserName);
+            if (b == null) return false;
+            b.getKalender().terminLoeschen(t);
+            // Falls Persistenz/DB genutzt wird, würde hier ein DB-Delete-Aufruf ergänzt werden.
+            return true;
+        } catch (Throwable ex) {
+            System.err.println("Löschen fehlgeschlagen: " + ex.getMessage());
+            return false;
+        }
+    }
 }

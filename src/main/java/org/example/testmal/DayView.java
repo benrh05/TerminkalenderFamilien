@@ -11,6 +11,12 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import javafx.scene.input.MouseButton;
+import javafx.scene.control.CustomMenuItem;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -254,17 +260,100 @@ public class DayView extends VBox {
                 block.setCursor(Cursor.DEFAULT);
             });
 
-            // --- NEU: Klick öffnet Edit-Dialog für diesen Termin ---
+            // --- NEU: ContextMenu mit "Löschen" (ohne Bestätigungsdialog, dezenter Hover, kein blaues Focus) ---
+            ContextMenu cm = new ContextMenu();
+            // dunkles Menü passend zum Theme
+            cm.setStyle(
+                    "-fx-background-color: #2a2a2d; " +
+                    "-fx-border-color: rgba(255,255,255,0.04); " +
+                    "-fx-background-radius: 8; " +
+                    "-fx-padding: 6;"
+            );
+
+            // Verwenden eines Buttons innerhalb eines CustomMenuItem ermöglicht kontrolliertes Styling
+            Button menuBtn = new Button("Löschen");
+            Label bin = new Label("\uD83D\uDDD1");
+            bin.setStyle("-fx-text-fill: #FF6B6B; -fx-font-size: 14px;");
+            menuBtn.setGraphic(bin);
+            // Basis-Style: transparent, helle Schrift, kein Fokus-Farbwechsel
+            menuBtn.setStyle(
+                    "-fx-background-color: transparent; " +
+                    "-fx-text-fill: #E6E6E6; " +
+                    "-fx-font-size: 13px; " +
+                    "-fx-padding: 6 10 6 10; " +
+                    "-fx-alignment: center-left; " +
+                    "-fx-focus-color: transparent; " +
+                    "-fx-faint-focus-color: transparent;"
+            );
+            // Verhindern, dass der Button beim Fokus blau wird / Fokus erhält visuelles Feedback
+            menuBtn.setFocusTraversable(false);
+
+            // Dezenter Hover-Effekt ohne native blau (nur leichte Helligkeitsänderung)
+            menuBtn.setOnMouseEntered(ev -> {
+                menuBtn.setStyle(
+                        "-fx-background-color: rgba(255,255,255,0.03); " +
+                        "-fx-text-fill: #E6E6E6; " +
+                        "-fx-font-size: 13px; " +
+                        "-fx-padding: 6 10 6 10; " +
+                        "-fx-alignment: center-left; " +
+                        "-fx-focus-color: transparent; " +
+                        "-fx-faint-focus-color: transparent;"
+                );
+                menuBtn.setCursor(Cursor.HAND);
+            });
+            menuBtn.setOnMouseExited(ev -> {
+                menuBtn.setStyle(
+                        "-fx-background-color: transparent; " +
+                        "-fx-text-fill: #E6E6E6; " +
+                        "-fx-font-size: 13px; " +
+                        "-fx-padding: 6 10 6 10; " +
+                        "-fx-alignment: center-left; " +
+                        "-fx-focus-color: transparent; " +
+                        "-fx-faint-focus-color: transparent;"
+                );
+                menuBtn.setCursor(Cursor.DEFAULT);
+            });
+
+            menuBtn.setOnAction(evt -> {
+                // Direkt löschen ohne Bestätigung
+                boolean ok = MainLogik.deleteTermin(t);
+                if (ok) {
+                    // Termine neu laden und DayView neu anzeigen
+                    List<Termin> newList = MainLogik.getTermineForDate(this.currentDate);
+                    this.show(this.currentDate, newList);
+                } else {
+                    Alert err = new Alert(Alert.AlertType.ERROR, "Termin konnte nicht gelöscht werden.");
+                    err.setHeaderText(null);
+                    err.initOwner(getScene() == null ? null : (Stage) getScene().getWindow());
+                    err.showAndWait();
+                }
+            });
+
+            CustomMenuItem cmi = new CustomMenuItem(menuBtn, false);
+            cmi.setHideOnClick(true);
+            cm.getItems().add(cmi);
+
+            // ContextMenu auf Request anzeigen (Rechtsklick)
+            block.setOnContextMenuRequested(cmEvent -> {
+                cm.show(block, cmEvent.getScreenX(), cmEvent.getScreenY());
+                cmEvent.consume();
+            });
+
+            // Alternativ: auch bei sekundärem Mausklick anzeigen (falls gewünscht)
             block.setOnMouseClicked(ev -> {
+                if (ev.getButton() == MouseButton.SECONDARY) {
+                    cm.show(block, ev.getScreenX(), ev.getScreenY());
+                    ev.consume();
+                    return;
+                }
+                // bestehende LMB-Click-Handler (Edit öffnen)
                 if (getScene() == null || getScene().getWindow() == null) return;
                 Stage owner = (Stage) getScene().getWindow();
-                // Callback: bei erfolgreichem Speichern soll die DayView neu laden
                 java.util.function.Consumer<Termin> onSaved = (Termin ignored) -> {
-                    // lade aktuelle Termine erneut und render neu
                     List<Termin> newList = MainLogik.getTermineForDate(this.currentDate);
-                    // show neu aufrufen (wird timeline neu aufbauen)
                     this.show(this.currentDate, newList);
                 };
+                // Öffnet Edit-Dialog
                 TerminAdd.show(owner, this.currentDate, t, onSaved);
             });
 

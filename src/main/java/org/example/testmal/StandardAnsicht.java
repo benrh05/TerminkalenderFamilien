@@ -28,6 +28,9 @@ import java.util.List;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.util.Duration;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.geometry.Side;
 
 public class StandardAnsicht extends Application {
 
@@ -117,18 +120,33 @@ public class StandardAnsicht extends Application {
 
         // Neuer: + Button öffnet TerminAdd und fügt Termin über MainLogik hinzu
         addBtn.setOnAction(e -> {
-            TerminAdd.show(primaryStageRef, LocalDate.now(), (Termin neu) -> {
-                try {
-                    MainLogik.addTermin(neu);
-                } catch (Throwable ex) {
-                    System.out.println("Konnte Termin nicht an MainLogik übergeben: " + ex.getMessage());
-                }
-                if (isDayView) {
-                    showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
-                } else {
-                    renderCalendar(); // neu rendern falls Monatsansicht sichtbar
-                }
+            ContextMenu addMenu = new ContextMenu();
+            MenuItem miTermin = new MenuItem("Termin hinzufügen");
+            MenuItem miBenutzer = new MenuItem("Benutzer hinzufügen");
+
+            miTermin.setOnAction(ae -> {
+                TerminAdd.show(primaryStageRef, LocalDate.now(), (Termin neu) -> {
+                    try {
+                        MainLogik.addTermin(neu);
+                    } catch (Throwable ex) {
+                        System.out.println("Konnte Termin nicht an MainLogik übergeben: " + ex.getMessage());
+                    }
+                    if (isDayView) {
+                        showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
+                    } else {
+                        renderCalendar(); // neu rendern falls Monatsansicht sichtbar
+                    }
+                });
             });
+
+            // vorerst keine Aktion – Platzhalter für späteren Benutzer-Workflow
+            miBenutzer.setOnAction(ae -> {
+                // TODO: Benutzer hinzufügen (noch nicht implementiert)
+            });
+
+            addMenu.getItems().addAll(miTermin, miBenutzer);
+            // Menu direkt am Button unten anzeigen
+            addMenu.show(addBtn, Side.BOTTOM, 0, 6);
         });
 
         Button kategorienBtn = new Button("Kategorien \u25BE"); // dropdown arrow
