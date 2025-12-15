@@ -183,7 +183,48 @@ public class TerminAdd extends Stage {
         Label lblKat = new Label("Kategorie:");
         lblKat.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblKat, 0, 3);
-        grid.add(kategorieCb, 1, 3, 2, 1);
+
+        // --- CHANGED: Kategorie-ComboBox + kleiner "+" Button zum Erstellen neuer Kategorien ---
+        Button addCategoryBtn = new Button("+");
+        addCategoryBtn.setPrefSize(28, 28);
+        addCategoryBtn.setStyle(
+                "-fx-background-color: transparent; -fx-border-color: rgba(255,255,255,0.06); " +
+                "-fx-border-radius: 6; -fx-background-radius: 6; -fx-text-fill: #E6E6E6;"
+        );
+        // Dezenter Hover-Effekt (ähnlich wie andere Buttons)
+        addCategoryBtn.setOnMouseEntered(ev -> {
+            addCategoryBtn.setCursor(Cursor.HAND);
+            addCategoryBtn.setScaleX(1.06);
+            addCategoryBtn.setScaleY(1.06);
+        });
+        addCategoryBtn.setOnMouseExited(ev -> {
+            addCategoryBtn.setCursor(Cursor.DEFAULT);
+            addCategoryBtn.setScaleX(1.0);
+            addCategoryBtn.setScaleY(1.0);
+        });
+
+        // Wenn auf "+" geklickt wird: KategorieAdd öffnen und Ergebnis in Combo übernehmen
+        addCategoryBtn.setOnAction(ev -> {
+            Stage owner = (getOwner() instanceof Stage) ? (Stage) getOwner() : null;
+            KategorieAdd.show(owner, (String newName) -> {
+                if (newName == null || newName.isBlank()) return;
+                // UI-Update im JavaFX-Thread
+                javafx.application.Platform.runLater(() -> {
+                    if (!kategorieCb.getItems().contains(newName)) {
+                        kategorieCb.getItems().add(newName);
+                    }
+                    kategorieCb.setValue(newName);
+                });
+            });
+        });
+
+        HBox katBox = new HBox(8, kategorieCb, addCategoryBtn);
+        katBox.setAlignment(Pos.CENTER_LEFT);
+        // ensure combo grows, button keeps fixed size
+        HBox.setHgrow(kategorieCb, Priority.ALWAYS);
+        kategorieCb.setMaxWidth(Double.MAX_VALUE);
+
+        grid.add(katBox, 1, 3, 2, 1);
 
         Label lblBesch = new Label("Beschreibung:");
         lblBesch.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");

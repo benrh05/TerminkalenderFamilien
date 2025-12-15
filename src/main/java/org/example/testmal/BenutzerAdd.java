@@ -1,6 +1,8 @@
 package org.example.testmal;
 
 import JavaLogik.Demos;
+import JavaLogik.MainLogik;
+import JavaLogik.Benutzer;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -17,6 +19,7 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
 import java.util.function.Consumer;
+import javafx.scene.control.Alert;
 
 public class BenutzerAdd extends Stage {
 
@@ -26,9 +29,11 @@ public class BenutzerAdd extends Stage {
     private TextField rolleField;
     private Label errorLbl;
 
-    private final Consumer<String> onCreated;
+    // Internes Callback liefert das erstellte Benutzer-Objekt (nullable bei Fehler)
+    private final java.util.function.Consumer<Benutzer> onCreated;
 
-    public BenutzerAdd(Stage owner, Consumer<String> onCreated) {
+    // Konstruktor: liefert das erstellte Benutzer-Objekt an den Caller
+    public BenutzerAdd(Stage owner, java.util.function.Consumer<Benutzer> onCreated) {
         this.onCreated = onCreated;
         initOwner(owner);
         initModality(Modality.WINDOW_MODAL);
@@ -172,6 +177,7 @@ public class BenutzerAdd extends Stage {
         saveBtn.setOnAction(e -> handleSave());
     }
 
+    // --- ERSETZTE Methode: handleSave() ---
     private void handleSave() {
         errorLbl.setText("");
 
@@ -193,15 +199,30 @@ public class BenutzerAdd extends Stage {
             return;
         }
 
-        boolean ok = Demos.getDemoFamilie().erstelleBenutzer(name, email, pwd, rolle);
-        if (!ok) {
-            errorLbl.setText("Benutzer konnte nicht erstellt werden (Name evtl. bereits vorhanden).");
+        boolean created = false;
+        try {
+            created = MainLogik.createBenutzer(name, email, pwd, rolle);
+        } catch (Throwable ex) {
+            created = false;
+            System.err.println("Fehler beim Anlegen des Benutzers: " + ex.getMessage());
+        }
+
+        if (!created) {
+            errorLbl.setText("Benutzer konnte nicht angelegt werden (Name evtl. bereits vergeben).");
             return;
         }
 
-        if (onCreated != null) {
-            onCreated.accept(name);
+        // Bei Erfolg: echtes Benutzer-Objekt holen und an Caller liefern
+        try {
+            Benutzer createdObj = MainLogik.getBenutzerByName(name);
+            if (this.onCreated != null) {
+                this.onCreated.accept(createdObj);
+            }
+        } catch (Throwable ex) {
+            System.err.println("Benutzer angelegt, aber Abruf schlug fehl: " + ex.getMessage());
+            if (this.onCreated != null) this.onCreated.accept(null);
         }
+
         close();
     }
 
@@ -229,7 +250,8 @@ public class BenutzerAdd extends Stage {
         });
     }
 
-    public static void show(Stage owner, Consumer<String> onCreated) {
+    // Anzeige: Callback liefert das erstellte Benutzer-Objekt
+    public static void show(Stage owner, java.util.function.Consumer<Benutzer> onCreated) {
         BenutzerAdd d = new BenutzerAdd(owner, onCreated);
         d.showAndWait();
     }

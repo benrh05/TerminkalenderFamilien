@@ -31,6 +31,7 @@ import javafx.util.Duration;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 import javafx.geometry.Side;
+import javafx.scene.control.Alert;
 
 public class StandardAnsicht extends Application {
 
@@ -67,6 +68,9 @@ public class StandardAnsicht extends Application {
 
     // Neues: mtBtn als Instanzfeld, damit andere Methoden die Beschriftung setzen können
     private Button mtBtn;
+
+    // NEU: userPanel als Instanzfeld, damit es aus Lambdas genutzt werden kann
+    private VBox userPanel;
 
     public static void main(String[] args) {
         launch(args);
@@ -118,6 +122,16 @@ public class StandardAnsicht extends Application {
         addBtn.setPrefSize(36, 28);
         nav.getChildren().addAll(prevBtn, nextBtn, addBtn);
 
+        // --- WICHTIG: userPanel FRÜHZEITIG initialisieren (vermeidet NPE in addBtn handler) ---
+        this.userPanel = new VBox(6);
+        this.userPanel.setPadding(new Insets(8));
+        this.userPanel.setStyle("-fx-background-color: #242428; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: rgba(255,255,255,0.03);");
+        this.userPanel.setVisible(false);
+        this.userPanel.setManaged(false);
+        this.userPanel.setMaxWidth(Double.MAX_VALUE);
+        // initial befüllen
+        refreshUserPanel();
+
         // Neuer: + Button öffnet TerminAdd und fügt Termin über MainLogik hinzu
         addBtn.setOnAction(e -> {
             ContextMenu addMenu = new ContextMenu();
@@ -126,11 +140,33 @@ public class StandardAnsicht extends Application {
 
             miTermin.setOnAction(ae -> {
                 TerminAdd.show(primaryStageRef, LocalDate.now(), (Termin neu) -> {
+                    if (neu == null) return;
                     try {
+                        boolean conflict = MainLogik.hasConflictForCurrentUser(neu);
+                        if (conflict) {
+                            javafx.scene.control.Alert confirm = new javafx.scene.control.Alert(
+                                    javafx.scene.control.Alert.AlertType.CONFIRMATION,
+                                    "Der Termin scheint sich mit bestehenden Terminen zu überschneiden. Trotzdem erstellen?",
+                                    javafx.scene.control.ButtonType.YES, javafx.scene.control.ButtonType.NO
+                            );
+                            confirm.setHeaderText(null);
+                            confirm.initOwner(primaryStageRef);
+                            java.util.Optional<javafx.scene.control.ButtonType> resp = confirm.showAndWait();
+                            if (!resp.isPresent() || resp.get() != javafx.scene.control.ButtonType.YES) {
+                                // Abbruch durch den Nutzer -> nicht anlegen
+                                return;
+                            }
+                        }
+
+                        // Entweder kein Konflikt oder Nutzer hat bestätigt
                         MainLogik.addTermin(neu);
                     } catch (Throwable ex) {
                         System.out.println("Konnte Termin nicht an MainLogik übergeben: " + ex.getMessage());
+                        javafx.scene.control.Alert err = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Termin konnte nicht erstellt werden.");
+                        err.initOwner(primaryStageRef);
+                        err.showAndWait();
                     }
+
                     if (isDayView) {
                         showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
                     } else {
@@ -140,12 +176,26 @@ public class StandardAnsicht extends Application {
             });
 
             miBenutzer.setOnAction(ae -> {
-                // Öffnet die Benutzer-Add-Stage; der Callback kann später genutzt werden,
-                // um die UI (z.B. userPanel) zu aktualisieren, derzeit keine zusätzliche Aktion.
-                BenutzerAdd.show(primaryStageRef, (String neuName) -> {
-                    // optional: UI-Aktualisierung (z. B. Benutzerliste neu laden)
-                    // wird aktuell nicht durchgeführt, damit die Änderung minimal bleibt.
-                });
+                // Öffne Benutzer-Dialog; bei Erfolg echten Benutzer-Objekt erhalten und UI updaten
+                java.util.function.Consumer<JavaLogik.Benutzer> onSaved = (JavaLogik.Benutzer neu) -> {
+                    if (neu == null) return;
+                    try {
+                        MainLogik.setCurrentUserName(neu.getName());
+                        currentUserLabel.setText(neu.getName());
+                        refreshUserPanel();
+                        if (isDayView) {
+                            showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
+                        } else {
+                            renderCalendar();
+                        }
+                    } catch (Throwable ex) {
+                        System.err.println("Fehler beim Verarbeiten des neuen Benutzers: " + ex.getMessage());
+                        Alert a = new Alert(Alert.AlertType.ERROR, "Benutzer erstellt, UI konnte nicht aktualisiert werden.");
+                        a.initOwner(primaryStageRef);
+                        a.showAndWait();
+                    }
+                };
+                BenutzerAdd.show(primaryStageRef, onSaved);
             });
 
             addMenu.getItems().addAll(miTermin, miBenutzer);
@@ -215,55 +265,19 @@ public class StandardAnsicht extends Application {
         topBar.getChildren().addAll(topLeftSpacer, monthLabel, searchField, searchBtn, currentUserLabel, profileBtn, mtBtn);
 
         // --- USER PANEL (ausklappbar unter "Benutzer wechseln") ---
-        VBox userPanel = new VBox(6);
-        userPanel.setPadding(new Insets(8));
-        userPanel.setStyle("-fx-background-color: #242428; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: rgba(255,255,255,0.03);");
-        userPanel.setVisible(false);
-        userPanel.setManaged(false);
-        userPanel.setMaxWidth(Double.MAX_VALUE);
-
-        List<String> users = MainLogik.getBenutzerNamen();
-        for (String u : users) {
-            Button ub = new Button(u);
-            ub.setPrefWidth(Double.MAX_VALUE);
-            ub.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-            ub.setOnMouseEntered(ev -> {
-                ub.setCursor(Cursor.HAND);
-                ub.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-            });
-            ub.setOnMouseExited(ev -> {
-                ub.setCursor(Cursor.DEFAULT);
-                ub.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-            });
-            ub.setOnAction(ev -> {
-                // setze aktuellen Benutzer in MainLogik
-                MainLogik.setCurrentUserName(u);
-                // UI-Update
-                currentUserLabel.setText(u);
-                userPanel.setVisible(false);
-                userPanel.setManaged(false);
-                // neu rendern: Tagesansicht zeigt nun nur Termine des neuen Benutzers,
-                // Monatsansicht bleibt, ggf. mit anderen Terminen (falls dort dargestellt)
-                if (isDayView) {
-                    showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
-                } else {
-                    renderCalendar();
-                }
-            });
-            userPanel.getChildren().add(ub);
-        }
+        // this.userPanel wurde bereits initialisiert weiter oben; Inhalte kommen aus refreshUserPanel()
 
         int insertIndex = leftBar.getChildren().indexOf(benutzerWechselnBtn);
         if (insertIndex >= 0) {
-            leftBar.getChildren().add(insertIndex + 1, userPanel);
+            leftBar.getChildren().add(insertIndex + 1, this.userPanel);
         } else {
-            leftBar.getChildren().add(userPanel);
+            leftBar.getChildren().add(this.userPanel);
         }
 
         benutzerWechselnBtn.setOnAction(e -> {
-            boolean showing = userPanel.isVisible();
-            userPanel.setVisible(!showing);
-            userPanel.setManaged(!showing);
+            boolean showing = this.userPanel.isVisible();
+            this.userPanel.setVisible(!showing);
+            this.userPanel.setManaged(!showing);
         });
 
         // --- CATEGORY PANEL (ausklappbar unter "Kategorien") ---
@@ -601,5 +615,49 @@ public class StandardAnsicht extends Application {
             b.setCursor(Cursor.DEFAULT);
             b.setTranslateY(0);
         });
+    }
+
+    // Aktualisiert Inhalte des userPanel aus MainLogik (sicher + defensiv)
+    private void refreshUserPanel() {
+        if (this.userPanel == null) return;
+        this.userPanel.getChildren().clear();
+        try {
+            List<String> names = MainLogik.getBenutzerNamen();
+            if (names == null) return;
+            for (String n : names) {
+                Button b = new Button(n);
+                b.setMaxWidth(Double.MAX_VALUE);
+                b.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+                b.setOnMouseEntered(ev -> {
+                    b.setCursor(Cursor.HAND);
+                    b.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+                });
+                b.setOnMouseExited(ev -> {
+                    b.setCursor(Cursor.DEFAULT);
+                    b.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+                });
+                b.setOnAction(ev -> {
+                    try {
+                        MainLogik.setCurrentUserName(n);
+                        currentUserLabel.setText(n);
+                        this.userPanel.setVisible(false);
+                        this.userPanel.setManaged(false);
+                        if (isDayView) {
+                            showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
+                        } else {
+                            renderCalendar();
+                        }
+                    } catch (Throwable ex) {
+                        System.err.println("Fehler beim Wechseln des Benutzers: " + ex.getMessage());
+                        Alert a = new Alert(Alert.AlertType.ERROR, "Benutzer konnte nicht gewechselt werden.");
+                        a.initOwner(primaryStageRef);
+                        a.showAndWait();
+                    }
+                });
+                this.userPanel.getChildren().add(b);
+            }
+        } catch (Throwable ex) {
+            System.err.println("refreshUserPanel failed: " + ex.getMessage());
+        }
     }
 }
