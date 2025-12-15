@@ -19,8 +19,8 @@ public class Demos {
         demoFamilie = new Familie("DemoFamilie");
 
         // Demo-Benutzer in der Familie anlegen (zuerst Benutzer erzeugen)
-        demoFamilie.erstelleBenutzer("Max Mustermann", "max@demo", "pass", "user");
-        demoFamilie.erstelleBenutzer("Anna Müller", "anna@demo", "pass", "user");
+        demoFamilie.erstelleBenutzer("Max Mustermann", "max@demo", "pass", "admin");
+        demoFamilie.erstelleBenutzer("Anna Müller", "anna@demo", "pass", "admin");
         demoFamilie.erstelleBenutzer("Chris Beispiel", "chris@demo", "pass", "user");
 
         // Kategorien anlegen (zwei Beispiele) und JEDEM Benutzer-Kalender hinzufügen
