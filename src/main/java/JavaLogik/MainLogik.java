@@ -4,6 +4,16 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.time.Instant; // ...neu
+// --- NEU: JDBC-Importe für DB-Persistenz ---
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+// NEU: Map für lokale Id-Zuordnung
+import java.util.Map;
+import java.util.HashMap;
 
 public class MainLogik {
 
@@ -13,6 +23,12 @@ public class MainLogik {
     static {
         // Demo-Daten zentral in Demos kapseln und einmal initialisieren
         Demos.demo();
+        // persistiere Demo-Daten in die Datenbank (defensiv)
+        try {
+            persistDemosToDB();
+        } catch (Throwable ex) {
+            System.err.println("Warnung: Persistieren der Demos in die DB fehlgeschlagen: " + ex.getMessage());
+        }
         // initialen Benutzer setzen (falls vorhanden)
         List<String> names = Demos.getBenutzerNamen();
         if (names != null && !names.isEmpty()) {
@@ -84,7 +100,9 @@ public class MainLogik {
             // Delegiere an Demos / Familie
             Familie fam = Demos.getDemoFamilie();
             if (fam == null) return false;
-            boolean created = fam.erstelleBenutzer(name.trim(), email == null ? "" : email.trim(), password == null ? "" : password, rolle == null ? "user" : rolle.trim());
+            // Default-Rolle: "KIND" (keine unzulässigen Werte wie "user" schreiben)
+            String roleToUse = (rolle == null || rolle.isBlank()) ? "KIND" : sanitizeRole(rolle.trim());
+            boolean created = fam.erstelleBenutzer(name.trim(), email == null ? "" : email.trim(), password == null ? "" : password, roleToUse);
             if (!created) return false;
 
             // Wenn erfolgreich: neues Benutzer-Objekt holen und Demo-Kategorien hinzufügen (falls noch nicht vorhanden)
@@ -152,16 +170,103 @@ public class MainLogik {
 
     // Fügt einen Termin dem Kalender des aktuellen Benutzers hinzu (nicht global)
     public static void addTermin(Termin t) {
+        if (t == null) return;
+
+        // 1) bestehendes Verhalten: in-memory hinzufügen (Demo / Benutzer-Kalender)
         if (currentUserName == null) {
-            // fallback: in den ersten Benutzer-Kalender
             Demos.addTermin(t);
-            return;
-        }
-        Benutzer b = Demos.getBenutzerByName(currentUserName);
-        if (b != null) {
-            b.getKalender().terminErstellenUndHinzufuegen(t);
         } else {
-            Demos.addTermin(t); // fallback
+            Benutzer b = Demos.getBenutzerByName(currentUserName);
+            if (b != null) {
+                b.getKalender().terminErstellenUndHinzufuegen(t);
+            } else {
+                Demos.addTermin(t); // fallback
+            }
+        }
+
+        // 2) Persistenz: versuche, den Termin in die DB zu schreiben (robust / optional)
+        try (Connection conn = Database.getConnection()) {
+            conn.setAutoCommit(false);
+            Integer personId = null;
+
+            // a) suche Person nach Namen
+            String personName = currentUserName == null ? "" : currentUserName;
+            try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM person WHERE name = ?")) {
+                ps.setString(1, personName);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) personId = rs.getInt(1);
+                }
+            }
+
+            // b) falls Person nicht existiert: lege sie an (mit einfachem Default-Passwort und Rolle 'KIND')
+            if (personId == null) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO person (name, passwort_hash, rolle) VALUES (?, ?, ?)",
+                        Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setString(1, personName);
+                    ps.setString(2, ""); // kein Passwort gesetzt (Default)
+                    ps.setString(3, "KIND");
+                    ps.executeUpdate();
+                    try (ResultSet keys = ps.getGeneratedKeys()) {
+                        if (keys.next()) personId = keys.getInt(1);
+                    }
+                }
+            }
+
+            // c) Kategorie behandeln (falls vorhanden): suchen / anlegen
+            Integer kategorieId = null;
+            if (t.getKategorie() != null && t.getKategorie().getName() != null && !t.getKategorie().getName().isBlank()) {
+                String kname = t.getKategorie().getName();
+                try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM kategorie WHERE name = ?")) {
+                    ps.setString(1, kname);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) kategorieId = rs.getInt(1);
+                    }
+                }
+
+                if (kategorieId == null) {
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "INSERT INTO kategorie (name, farbe) VALUES (?, ?)",
+                            Statement.RETURN_GENERATED_KEYS)) {
+                        ps.setString(1, kname);
+                        ps.setString(2, t.getKategorie().getFarbe() == null ? "" : t.getKategorie().getFarbe());
+                        ps.executeUpdate();
+                        try (ResultSet keys = ps.getGeneratedKeys()) {
+                            if (keys.next()) kategorieId = keys.getInt(1);
+                        }
+                    }
+                }
+            }
+
+            // d) Termin einfügen
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO termin (titel, beschreibung, startzeit, endzeit, kategorie_id, person_id) VALUES (?, ?, ?, ?, ?, ?)")) {
+                ps.setString(1, t.getTitel());
+                ps.setString(2, t.getBeschreibung());
+                ps.setTimestamp(3, Timestamp.from(t.getStart()));
+                ps.setTimestamp(4, Timestamp.from(t.getEnde()));
+                if (kategorieId != null) {
+                    ps.setInt(5, kategorieId);
+                } else {
+                    ps.setNull(5, java.sql.Types.INTEGER);
+                }
+                if (personId != null) {
+                    ps.setInt(6, personId);
+                } else {
+                    ps.setNull(6, java.sql.Types.INTEGER);
+                }
+                ps.executeUpdate();
+            }
+
+            conn.commit();
+        } catch (SQLException ex) {
+            // DB-Fehler dürfen die UI nicht crashen — loggen und weiter
+            System.err.println("DB-Persistenz fehlgeschlagen (Termin): " + ex.getMessage());
+            try {
+                // Versuch: keine harte Fehlerbehandlung, Verbindung wird beim Try-With-Resources geschlossen
+            } catch (Throwable ignore) {}
+        } catch (Throwable ex) {
+            System.err.println("Unerwarteter Fehler bei DB-Persistenz (Termin): " + ex.getMessage());
         }
     }
 
@@ -233,5 +338,227 @@ public class MainLogik {
             System.err.println("createKategorie fehlgeschlagen: " + ex.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Persistiert die Demo-Daten (Benutzer, Kategorien, Termine) in die relationale DB.
+     * Verhalten: defensiv, Fehler werden geloggt, sollen aber den Start nicht verhindern.
+     */
+    private static void persistDemosToDB() {
+        try (Connection conn = Database.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // global caches um mehrfaches SELECT/INSERT zu vermeiden
+                Map<String, Integer> personCache = new HashMap<>();
+                Map<String, Integer> categoryCache = new HashMap<>();
+
+                List<String> names = Demos.getBenutzerNamen();
+                if (names == null || names.isEmpty()) {
+                    conn.commit();
+                    return;
+                }
+
+                for (String name : names) {
+                    try {
+                        Benutzer b = Demos.getBenutzerByName(name);
+                        if (b == null) continue;
+
+                        // --- Person: prüfen / anlegen (robust: SELECT -> INSERT -> SELECT -> ggf. UPDATE) ---
+                        Integer personId = null;
+                        if (personCache.containsKey(b.getName())) {
+                            personId = personCache.get(b.getName());
+                        } else {
+                            // 1) prüfen ob bereits vorhanden
+                            try (PreparedStatement ps = conn.prepareStatement("SELECT id, passwort_hash, rolle FROM person WHERE name = ?")) {
+                                ps.setString(1, b.getName());
+                                try (ResultSet rs = ps.executeQuery()) {
+                                    if (rs.next()) {
+                                        personId = rs.getInt("id");
+                                    }
+                                }
+                            }
+
+                            // 2) falls nicht vorhanden: Insert versuchen
+                            if (personId == null) {
+                                String pw = (b.getPassword() == null) ? "" : b.getPassword();
+                                String roleToWrite = sanitizeRole(b.getRolle());
+                                try (PreparedStatement ps = conn.prepareStatement(
+                                        "INSERT INTO person (name, passwort_hash, rolle) VALUES (?, ?, ?)",
+                                        Statement.RETURN_GENERATED_KEYS)) {
+                                    ps.setString(1, b.getName());
+                                    ps.setString(2, pw);
+                                    ps.setString(3, roleToWrite);
+                                    ps.executeUpdate();
+                                    try (ResultSet keys = ps.getGeneratedKeys()) {
+                                        if (keys.next()) personId = keys.getInt(1);
+                                    }
+                                } catch (SQLException insertEx) {
+                                    // Insert kann z.B. wegen Race-Condition oder ENUM-Fehler fehlschlagen.
+                                    // Versuche erneut die id zu lesen; falls gefunden, setzen wir personId und fahren fort.
+                                    try (PreparedStatement ps2 = conn.prepareStatement("SELECT id FROM person WHERE name = ?")) {
+                                        ps2.setString(1, b.getName());
+                                        try (ResultSet rs2 = ps2.executeQuery()) {
+                                            if (rs2.next()) personId = rs2.getInt(1);
+                                        }
+                                    } catch (SQLException ignore) {
+                                        // nichts weiter tun, wir loggen das ursprüngliche insertEx
+                                    }
+                                }
+                            }
+
+                            // 3) Falls wir jetzt eine personId haben, stelle sicher dass passwort_hash und rolle korrekt gesetzt sind.
+                            if (personId != null) {
+                                // Lade aktuelle DB-Werte
+                                String dbPw = null;
+                                String dbRolle = null;
+                                try (PreparedStatement ps = conn.prepareStatement("SELECT passwort_hash, rolle FROM person WHERE id = ?")) {
+                                    ps.setInt(1, personId);
+                                    try (ResultSet rs = ps.executeQuery()) {
+                                        if (rs.next()) {
+                                            dbPw = rs.getString("passwort_hash");
+                                            dbRolle = rs.getString("rolle");
+                                        }
+                                    }
+                                }
+
+                                String desiredPw = (b.getPassword() == null) ? "" : b.getPassword();
+                                String desiredRole = sanitizeRole(b.getRolle());
+
+                                boolean needUpdate = false;
+                                String updateSql = "UPDATE person SET ";
+                                List<Object> params = new ArrayList<>();
+                                if ((dbPw == null || dbPw.isEmpty()) && (desiredPw != null && !desiredPw.isEmpty())) {
+                                    updateSql += "passwort_hash = ?";
+                                    params.add(desiredPw);
+                                    needUpdate = true;
+                                }
+                                // Rolle: falls DB-Rolle null oder unterschiedlich und desiredRole ist valider ENUM -> update
+                                if ((dbRolle == null || !dbRolle.equalsIgnoreCase(desiredRole))
+                                        && desiredRole != null && !desiredRole.isEmpty()) {
+                                    if (needUpdate) updateSql += ", ";
+                                    updateSql += "rolle = ?";
+                                    params.add(desiredRole);
+                                    needUpdate = true;
+                                }
+                                if (needUpdate) {
+                                    updateSql += " WHERE id = ?";
+                                    params.add(personId);
+                                    try (PreparedStatement ups = conn.prepareStatement(updateSql)) {
+                                        for (int i = 0; i < params.size(); i++) {
+                                            Object p = params.get(i);
+                                            if (p instanceof String) ups.setString(i + 1, (String) p);
+                                            else if (p instanceof Integer) ups.setInt(i + 1, (Integer) p);
+                                            else ups.setObject(i + 1, p);
+                                        }
+                                        ups.executeUpdate();
+                                    } catch (SQLException uex) {
+                                        // Falls UPDATE fehlschlägt -> loggen und weitermachen
+                                        System.err.println("Warnung: konnte person (update) nicht anpassen: " + uex.getMessage());
+                                    }
+                                }
+                            }
+
+                            if (personId != null) personCache.put(b.getName(), personId);
+                        }
+
+                        // --- Kategorien des Benutzers: prüfen / anlegen (global einzigartig nach name) ---
+                        Kalender kal = b.getKalender();
+                        if (kal != null) {
+                            for (Kategorie k : kal.getKategorien()) {
+                                if (k == null || k.getName() == null || k.getName().isBlank()) continue;
+                                if (categoryCache.containsKey(k.getName())) continue;
+
+                                Integer catId = null;
+                                try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM kategorie WHERE name = ?")) {
+                                    ps.setString(1, k.getName());
+                                    try (ResultSet rs = ps.executeQuery()) {
+                                        if (rs.next()) catId = rs.getInt(1);
+                                    }
+                                }
+                                if (catId == null) {
+                                    try (PreparedStatement ps = conn.prepareStatement(
+                                            "INSERT INTO kategorie (name, farbe) VALUES (?, ?)",
+                                            Statement.RETURN_GENERATED_KEYS)) {
+                                        ps.setString(1, k.getName());
+                                        ps.setString(2, k.getFarbe() == null ? "" : k.getFarbe());
+                                        ps.executeUpdate();
+                                        try (ResultSet keys = ps.getGeneratedKeys()) {
+                                            if (keys.next()) catId = keys.getInt(1);
+                                        }
+                                    }
+                                }
+                                if (catId != null) categoryCache.put(k.getName(), catId);
+                            }
+                        }
+
+                        // --- Termine des Benutzers: prüfen / anlegen ---
+                        if (kal != null) {
+                            for (Termin t : kal.getTermine()) {
+                                if (t == null) continue;
+                                try {
+                                    // Bestimme kategorie_id (falls gesetzt)
+                                    Integer kId = null;
+                                    if (t.getKategorie() != null && t.getKategorie().getName() != null) {
+                                        kId = categoryCache.get(t.getKategorie().getName());
+                                        if (kId == null) {
+                                            // Fallback: suche in DB (sollte aber bereits in cache sein)
+                                            try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM kategorie WHERE name = ?")) {
+                                                ps.setString(1, t.getKategorie().getName());
+                                                try (ResultSet rs = ps.executeQuery()) {
+                                                    if (rs.next()) kId = rs.getInt(1);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Einfügen: einfache Strategie ohne Duplikaterkennung (Demo-Daten werden einmalig eingefügt)
+                                    try (PreparedStatement ps = conn.prepareStatement(
+                                            "INSERT INTO termin (titel, beschreibung, startzeit, endzeit, kategorie_id, person_id) VALUES (?, ?, ?, ?, ?, ?)")) {
+                                        ps.setString(1, t.getTitel());
+                                        ps.setString(2, t.getBeschreibung());
+                                        ps.setTimestamp(3, Timestamp.from(t.getStart()));
+                                        ps.setTimestamp(4, Timestamp.from(t.getEnde()));
+                                        if (kId != null) {
+                                            ps.setInt(5, kId);
+                                        } else {
+                                            ps.setNull(5, java.sql.Types.INTEGER);
+                                        }
+                                        if (personCache.get(b.getName()) != null) {
+                                            ps.setInt(6, personCache.get(b.getName()));
+                                        } else {
+                                            ps.setNull(6, java.sql.Types.INTEGER);
+                                        }
+                                        ps.executeUpdate();
+                                    }
+                                } catch (SQLException ste) {
+                                    // Fehler bei einzelnen Termin -> loggen und weitermachen
+                                    System.err.println("Fehler beim Einfügen eines Demo-Termins: " + ste.getMessage());
+                                }
+                            }
+                        }
+                    } catch (Throwable inner) {
+                        System.err.println("Fehler beim Persistieren des Benutzers '" + name + "': " + inner.getMessage());
+                    }
+                }
+
+                conn.commit();
+            } catch (Throwable t) {
+                try { conn.rollback(); } catch (Throwable ignore) {}
+                throw t;
+            }
+        } catch (SQLException ex) {
+            System.err.println("Datenbankfehler beim Persistieren der Demos: " + ex.getMessage());
+        } catch (Throwable ex) {
+            System.err.println("Unerwarteter Fehler beim Persistieren der Demos: " + ex.getMessage());
+        }
+    }
+
+    // --- NEU: Hilfsmethode zur Normalisierung von Rollen für DB-Insert (nur ADMIN oder KIND zulassen) ---
+    private static String sanitizeRole(String rolle) {
+        if (rolle == null) return "KIND";
+        String r = rolle.trim().toUpperCase();
+        if ("ADMIN".equals(r)) return "ADMIN";
+        // nur zulässige Werte sind ADMIN oder KIND -> alles andere als KIND behandeln
+        return "KIND";
     }
 }
