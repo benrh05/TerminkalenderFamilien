@@ -31,9 +31,45 @@ public class MainLogik {
         return currentUserName;
     }
 
+    // Flag: wenn true -> zeige Termine aller Benutzer der Familie (statt nur des aktuellen Users)
+    private static boolean showAllFamilyTermine = false;
+
+    public static void setShowAllFamilyTermine(boolean v) {
+        showAllFamilyTermine = v;
+    }
+
+    public static boolean isShowAllFamilyTermine() {
+        return showAllFamilyTermine;
+    }
+
     // Liefert die Termine für ein bestimmtes Datum (Wrapper) -> jetzt pro aktuellem Benutzer
     public static List<Termin> getTermineForDate(LocalDate date) {
-        return Demos.getTermineForDateForUser(date, currentUserName);
+        try {
+            if (date == null) return new ArrayList<>();
+            // Wenn Flag gesetzt: aggregiere Termine aller Benutzer in der Demo-Familie
+            if (showAllFamilyTermine) {
+                List<Termin> all = new ArrayList<>();
+                Familie fam = Demos.getDemoFamilie();
+                if (fam == null) return all;
+                List<Benutzer> mitglieder = fam.getMitglieder();
+                if (mitglieder == null) return all;
+                for (Benutzer b : mitglieder) {
+                    try {
+                        if (b != null && b.getKalender() != null) {
+                            List<Termin> t = b.getKalender().getTermineForDate(date);
+                            if (t != null && !t.isEmpty()) all.addAll(t);
+                        }
+                    } catch (Throwable ignore) {}
+                }
+                return all;
+            } else {
+                // Standard: nur Termine des aktuellen Benutzers
+                return Demos.getTermineForDateForUser(date, currentUserName);
+            }
+        } catch (Throwable ex) {
+            System.err.println("getTermineForDate failed: " + ex.getMessage());
+            return new ArrayList<>();
+        }
     }
 
     // Wrapper: liefert Benutzernamen aus der Demo-Familie (Wrapper)
@@ -136,7 +172,7 @@ public class MainLogik {
             if (currentUserName == null) return false;
             Benutzer b = Demos.getBenutzerByName(currentUserName);
             if (b == null) return false;
-            // Kalender.terminBearbeiten führt die eigentliche Bearbeitung durch
+            // Kalender.terminBearbeiten führt the eigentliche Bearbeitung durch
             return b.getKalender().terminBearbeiten(original, neuerTitel, neuerStart, neuesEnde, neueBeschreibung, neueKategorie);
         } catch (Throwable ex) {
             // bei Fehlern false zurückgeben

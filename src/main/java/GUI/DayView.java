@@ -1,26 +1,24 @@
-package org.example.testmal;
+package GUI;
 
 import JavaLogik.Termin;
 import JavaLogik.MainLogik;
+import JavaLogik.Demos;
+import JavaLogik.Benutzer;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.scene.control.ContextMenu;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
 import javafx.scene.input.MouseButton;
 import javafx.scene.control.CustomMenuItem;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 
 public class DayView extends VBox {
@@ -233,7 +231,15 @@ public class DayView extends VBox {
                     clippedEnd.getHour(), clippedEnd.getMinute()
             );
 
-            Label titleLabel = new Label(t.getTitel());
+            // Ersetze: Label titleLabel = new Label(t.getTitel());
+            String displayTitle = t.getTitel() == null ? "" : t.getTitel();
+            if (MainLogik.isShowAllFamilyTermine()) {
+                String owner = findOwnerNameForTermin(t);
+                if (owner != null && !owner.isBlank()) {
+                    displayTitle = owner + ": " + displayTitle;
+                }
+            }
+            Label titleLabel = new Label(displayTitle);
             titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold;");
 
             Label timeLabel = new Label(timeRange);
@@ -363,5 +369,18 @@ public class DayView extends VBox {
 
     public void setOnRequestBack(Runnable r) {
         this.onRequestBack = r;
+    }
+
+    // Helfer: findet den Benutzernamen, dem dieser Termin gehört (oder null)
+    private String findOwnerNameForTermin(Termin t) {
+        try {
+            var fam = Demos.getDemoFamilie();
+            if (fam == null) return null;
+            for (Benutzer b : fam.getMitglieder()) {
+                if (b == null || b.getKalender() == null) continue;
+                if (b.getKalender().getTermine().contains(t)) return b.getName();
+            }
+        } catch (Throwable ignore) {}
+        return null;
     }
 }

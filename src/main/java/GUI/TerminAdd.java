@@ -1,4 +1,4 @@
-package org.example.testmal;
+package GUI;
 
 import JavaLogik.Termin;
 import JavaLogik.Kategorie;

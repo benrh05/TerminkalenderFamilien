@@ -1,8 +1,10 @@
 // java
-package org.example.testmal;
+package GUI;
 
 import JavaLogik.Termin;
 import JavaLogik.MainLogik;
+import JavaLogik.Demos;
+import JavaLogik.Benutzer;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -23,6 +25,9 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.Set;
 
 // zusätzliche Importe für die Uhr
 import javafx.animation.KeyFrame;
@@ -33,7 +38,6 @@ import javafx.scene.control.MenuItem;
 import javafx.geometry.Side;
 import javafx.scene.control.Alert;
 import javafx.application.Platform;
-import java.util.function.Consumer;
 
 public class StandardAnsicht extends Application {
 
@@ -80,6 +84,10 @@ public class StandardAnsicht extends Application {
     // NEU: aktuell gewählte Kategorie (null = alle)
     private String selectedCategoryName = null;
 
+    // Notification timeline + shown keys to avoid duplicates
+    private Timeline notificationTimeline;
+    private final Set<String> shownNotifications = new HashSet<>();
+
     public static void main(String[] args) {
         launch(args);
     }
@@ -114,7 +122,7 @@ public class StandardAnsicht extends Application {
         dateTimeLabel.setStyle("-fx-text-fill: #E6E6E6;");
 
         // Timeline aktualisiert die Anzeige jede Sekunde
-        clockTimeline = new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
+        clockTimeline = new Timeline(new KeyFrame(javafx.util.Duration.seconds(1), ev -> {
             dateTimeLabel.setText(LocalDateTime.now().format(dtf));
         }));
         clockTimeline.setCycleCount(Timeline.INDEFINITE);
@@ -240,34 +248,54 @@ public class StandardAnsicht extends Application {
         searchField.setPrefWidth(360);
         Button searchBtn = new Button("\uD83D\uDD0D"); // 🔍
         Button profileBtn = new Button("\uD83D\uDC64"); // 👤
-        profileBtn.setPrefSize(44, 36);
+         profileBtn.setPrefSize(44, 36);
 
         // Erstelle mtBtn als Instanz-Button (Text initial "Heute")
-        this.mtBtn = new Button("Heute");
-        mtBtn.setPrefSize(54, 36);
-        mtBtn.setTooltip(new javafx.scene.control.Tooltip("Zwischen Monats- und Tagesansicht wechseln"));
+         this.mtBtn = new Button("Heute");
+         mtBtn.setPrefSize(54, 36);
+         mtBtn.setTooltip(new javafx.scene.control.Tooltip("Zwischen Monats- und Tagesansicht wechseln"));
 
-        // Neuer: Label für aktuellen Benutzer (neben Profil-Icon)
-        currentUserLabel = new Label(MainLogik.getCurrentUserName());
-        currentUserLabel.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
-        currentUserLabel.setPadding(new Insets(0, 6, 0, 0));
+         // Neuer: Label für aktuellen Benutzer (neben Profil-Icon)
+         currentUserLabel = new Label(MainLogik.getCurrentUserName());
+         currentUserLabel.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
+         currentUserLabel.setPadding(new Insets(0, 6, 0, 0));
 
-        // Neuer: Monat-Label, links vom Suchfeld (Instanzfeld damit später aktualisierbar)
-        monthLabel = new Label(currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
-        monthLabel.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 16px;");
+         // Neuer: Monat-Label, links vom Suchfeld (Instanzfeld damit später aktualisierbar)
+         monthLabel = new Label(currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+         monthLabel.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 16px;");
 
-        searchField.setStyle(
-                "-fx-background-radius: 8; -fx-border-radius: 8; -fx-background-color: #232324; " +
-                        "-fx-border-color: rgba(255,255,255,0.07); -fx-padding: 8; -fx-text-fill: #F2F2F2;");
-        searchBtn.setStyle(
-                "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
-                        "-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 6; -fx-text-fill: #F2F2F2;");
-        mtBtn.setStyle(
-                "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
-                        "-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 6; -fx-text-fill: #F2F2F2;");
-        profileBtn.setStyle(
-                "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
-                        "-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 6 8 6 8; -fx-text-fill: #F2F2F2;");
+         searchField.setStyle(
+                 "-fx-background-radius: 8; -fx-border-radius: 8; -fx-background-color: #232324; " +
+                         "-fx-border-color: rgba(255,255,255,0.07); -fx-padding: 8; -fx-text-fill: #F2F2F2;");
+         searchBtn.setStyle(
+                 "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
+                         "-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 6; -fx-text-fill: #F2F2F2;");
+         mtBtn.setStyle(
+                 "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
+                         "-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 6; -fx-text-fill: #F2F2F2;");
+         profileBtn.setStyle(
+                 "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
+                         "-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 6 8 6 8; -fx-text-fill: #F2F2F2;");
+
+       // Tooltip und initialer visueller Zustand entsprechend MainLogik-Flag
+        updateProfileButtonVisual(profileBtn);
+
+        // Toggle: zeigt entweder nur Termine des aktuellen Benutzers oder alle Termine der Familie
+        profileBtn.setOnAction(e -> {
+            boolean newState = !MainLogik.isShowAllFamilyTermine();
+            MainLogik.setShowAllFamilyTermine(newState);
+            updateProfileButtonVisual(profileBtn);
+            // Neu rendern der aktuell sichtbaren Ansicht
+           try {
+                if (isDayView) {
+                    showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
+               } else {
+                    renderCalendar();
+                }
+            } catch (Throwable ex) {
+                System.err.println("Fehler beim Aktualisieren der Ansicht nach Toggle All-Users: " + ex.getMessage());
+            }
+        });
 
         // Topbar jetzt mit monthLabel vor dem searchField
         topBar.getChildren().addAll(topLeftSpacer, monthLabel, searchField, searchBtn, currentUserLabel, profileBtn, mtBtn);
@@ -387,7 +415,19 @@ public class StandardAnsicht extends Application {
         // Timeline beim Schließen stoppen, damit kein Hintergrund-Thread weiterläuft
         primaryStage.setOnCloseRequest(ev -> {
             if (clockTimeline != null) clockTimeline.stop();
+            if (notificationTimeline != null) notificationTimeline.stop();
         });
+
+        // --- NEU: Benachrichtigungs-Timeline starten (prüft alle 30 Sekunden) ---
+        notificationTimeline = new Timeline(new KeyFrame(javafx.util.Duration.seconds(30), ev -> {
+            try {
+                checkNotifications();
+            } catch (Throwable ex) {
+                System.err.println("Fehler in Notification-Check: " + ex.getMessage());
+            }
+        }));
+        notificationTimeline.setCycleCount(Timeline.INDEFINITE);
+        notificationTimeline.play();
 
         applyHover(prevBtn);
         applyHover(nextBtn);
@@ -533,7 +573,16 @@ public class StandardAnsicht extends Application {
                                 "-fx-border-color: rgba(0,0,0,0.12);"
                             );
 
-                            Label tlabel = new Label(t.getTitel());
+                            // Ersetze:
+                            // Label tlabel = new Label(t.getTitel());
+                            String displayTitle = t.getTitel() == null ? "" : t.getTitel();
+                            if (MainLogik.isShowAllFamilyTermine()) {
+                                String owner = findOwnerNameForTermin(t);
+                                if (owner != null && !owner.isBlank()) {
+                                    displayTitle = owner + ": " + displayTitle;
+                                }
+                            }
+                            Label tlabel = new Label(displayTitle);
                             tlabel.setStyle("-fx-text-fill: white; -fx-font-size: 11px;");
                             tlabel.setPadding(new Insets(0, 8, 0, 8));
                             bar.getChildren().add(tlabel);
@@ -747,5 +796,84 @@ public class StandardAnsicht extends Application {
         } catch (Throwable ex) {
             System.err.println("refreshCategoryPanel failed: " + ex.getMessage());
         }
+    }
+
+    // helper: passt Profil-Button-Style und Tooltip an den aktuellen Toggle-Zustand an
+    private void updateProfileButtonVisual(Button profileBtn) {
+        if (MainLogik.isShowAllFamilyTermine()) {
+            profileBtn.setStyle(
+                    "-fx-background-color: linear-gradient(#3A6DFF, #2A56D6); " +
+                    "-fx-border-color: rgba(255,255,255,0.12); " +
+                    "-fx-background-radius: 8; -fx-border-radius: 8; -fx-text-fill: white;"
+            );
+            profileBtn.setTooltip(new javafx.scene.control.Tooltip("Alle Termine anzeigen (An/Aus)"));
+        } else {
+            profileBtn.setStyle(
+                    "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
+                    "-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 6 8 6 8; -fx-text-fill: #F2F2F2;"
+            );
+            profileBtn.setTooltip(new javafx.scene.control.Tooltip("Nur Termine des aktuellen Benutzers anzeigen"));
+        }
+    }
+
+    // Prüft, ob Termine in genau 30 Minuten beginnen (toleranz 60 Sekunden) und zeigt Popup einmalig an
+    private void checkNotifications() {
+        try {
+            // Zielzeit: jetzt + 30 Minuten (Toleranzfenster: [target, target + 59s])
+            Instant now = Instant.now();
+            Instant target = now.plus(30, ChronoUnit.MINUTES);
+            Instant windowEnd = target.plus(59, ChronoUnit.SECONDS);
+
+            // LocalDate des target (für Kalender-Abfragen)
+            ZoneId zone = ZoneId.systemDefault();
+            LocalDate targetDate = ZonedDateTime.ofInstant(target, zone).toLocalDate();
+
+            // Hole Demo-Familie-Mitglieder sicher
+            var fam = Demos.getDemoFamilie();
+            if (fam == null) return;
+            var members = fam.getMitglieder();
+            if (members == null || members.isEmpty()) return;
+
+            for (Benutzer b : members) {
+                if (b == null || b.getKalender() == null) continue;
+                List<Termin> terms = b.getKalender().getTermineForDate(targetDate);
+                if (terms == null || terms.isEmpty()) continue;
+                for (Termin t : terms) {
+                    if (t == null || t.getStart() == null) continue;
+                    Instant s = t.getStart();
+                    // prüfen ob Start innerhalb des Fensters liegt
+                    if (!s.isBefore(target) && !s.isAfter(windowEnd)) {
+                        // Erzeuge eindeutigen Key: user|startEpoch|titel
+                        String key = b.getName() + "|" + s.toEpochMilli() + "|" + (t.getTitel() == null ? "" : t.getTitel());
+                        if (shownNotifications.contains(key)) continue; // schon angezeigt
+                        // Merken und anzeigen
+                        shownNotifications.add(key);
+                        // UI-Thread: Benachrichtigung anzeigen
+                        javafx.application.Platform.runLater(() -> {
+                            try {
+                                Benachrichtigung.showReminder(primaryStageRef, t, b);
+                            } catch (Throwable ex) {
+                                System.err.println("Fehler beim Anzeigen der Benachrichtigung: " + ex.getMessage());
+                            }
+                        });
+                    }
+                }
+            }
+        } catch (Throwable ex) {
+            System.err.println("checkNotifications failed: " + ex.getMessage());
+        }
+    }
+
+    // Helfer: findet den Benutzernamen, dem dieser Termin gehört (oder null)
+    private String findOwnerNameForTermin(Termin t) {
+        try {
+            var fam = Demos.getDemoFamilie();
+            if (fam == null) return null;
+            for (Benutzer b : fam.getMitglieder()) {
+                if (b == null || b.getKalender() == null) continue;
+                if (b.getKalender().getTermine().contains(t)) return b.getName();
+            }
+        } catch (Throwable ignore) {}
+        return null;
     }
 }

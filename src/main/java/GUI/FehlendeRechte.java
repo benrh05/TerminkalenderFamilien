@@ -1,5 +1,5 @@
 // java
-package org.example.testmal;
+package GUI;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;

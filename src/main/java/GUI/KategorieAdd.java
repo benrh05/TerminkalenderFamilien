@@ -1,7 +1,5 @@
-package org.example.testmal;
+package GUI;
 
-import JavaLogik.Kategorie;
-import JavaLogik.Benutzer;
 import JavaLogik.MainLogik;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;

@@ -4,6 +4,6 @@ module org.example.testmal {
     requires java.sql;
 
 
-    opens org.example.testmal to javafx.fxml;
-    exports org.example.testmal;
+    opens GUI to javafx.fxml;
+    exports GUI;
 }

@@ -1,6 +1,5 @@
-package org.example.testmal;
+package GUI;
 
-import JavaLogik.Demos;
 import JavaLogik.MainLogik;
 import JavaLogik.Benutzer;
 import javafx.geometry.Insets;
@@ -17,9 +16,6 @@ import javafx.scene.text.Font;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
-
-import java.util.function.Consumer;
-import javafx.scene.control.Alert;
 
 public class BenutzerAdd extends Stage {
 
