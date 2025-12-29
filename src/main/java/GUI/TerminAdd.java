@@ -1,3 +1,4 @@
+// java
 package GUI;
 
 import JavaLogik.Termin;
@@ -37,27 +38,39 @@ public class TerminAdd extends Stage {
 
     // --- Logik-Felder ---
     private final Consumer<Termin> onSaved;
+    private final Runnable onKategorieChanged; // NEU: wird aufgerufen wenn im Dialog eine Kategorie erstellt wurde
     private final Termin existingTermin;
     private final boolean editMode;
 
     // Formatter für die Zeit-Eingabe
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
-    // --- Konstruktor für "Neuen Termin anlegen" ---
+    // --- Konstruktor für "Neuen Termin anlegen" (alt, kompatibel) ---
     public TerminAdd(Stage owner, LocalDate defaultDate, Consumer<Termin> onSaved) {
+        this(owner, defaultDate, onSaved, null);
+    }
+
+    // --- Konstruktor für "Neuen Termin anlegen" (neu mit Callback) ---
+    public TerminAdd(Stage owner, LocalDate defaultDate, Consumer<Termin> onSaved, Runnable onKategorieChanged) {
         this.onSaved = onSaved;
+        this.onKategorieChanged = onKategorieChanged;
         this.existingTermin = null;
         this.editMode = false;
 
         initWindow(owner);
         initFields(defaultDate);
-        // Kein bestehender Termin → nichts zum Vorbefüllen
         buildScene("Neuen Termin anlegen");
     }
 
-    // --- Konstruktor für "Termin bearbeiten" ---
+    // --- Konstruktor für "Termin bearbeiten" (alt, kompatibel) ---
     public TerminAdd(Stage owner, LocalDate defaultDate, Termin existing, Consumer<Termin> onSaved) {
+        this(owner, defaultDate, existing, onSaved, null);
+    }
+
+    // --- Konstruktor für "Termin bearbeiten" (neu mit Callback) ---
+    public TerminAdd(Stage owner, LocalDate defaultDate, Termin existing, Consumer<Termin> onSaved, Runnable onKategorieChanged) {
         this.onSaved = onSaved;
+        this.onKategorieChanged = onKategorieChanged;
         this.existingTermin = existing;
         this.editMode = (existing != null);
 
@@ -111,9 +124,7 @@ public class TerminAdd extends Stage {
 
     // --- Felder aus bestehendem Termin vorbefüllen (für Edit-Modus) ---
     private void fillFieldsFromExisting() {
-        if (existingTermin == null) {
-            return;
-        }
+        if (existingTermin == null) return;
 
         try {
             if (existingTermin.getTitel() != null) {
@@ -184,14 +195,13 @@ public class TerminAdd extends Stage {
         lblKat.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblKat, 0, 3);
 
-        // --- CHANGED: Kategorie-ComboBox + kleiner "+" Button zum Erstellen neuer Kategorien ---
+        // Kategorie-ComboBox + kleiner "+" Button zum Erstellen neuer Kategorien
         Button addCategoryBtn = new Button("+");
         addCategoryBtn.setPrefSize(28, 28);
         addCategoryBtn.setStyle(
                 "-fx-background-color: transparent; -fx-border-color: rgba(255,255,255,0.06); " +
-                "-fx-border-radius: 6; -fx-background-radius: 6; -fx-text-fill: #E6E6E6;"
+                        "-fx-border-radius: 6; -fx-background-radius: 6; -fx-text-fill: #E6E6E6;"
         );
-        // Dezenter Hover-Effekt (ähnlich wie andere Buttons)
         addCategoryBtn.setOnMouseEntered(ev -> {
             addCategoryBtn.setCursor(Cursor.HAND);
             addCategoryBtn.setScaleX(1.06);
@@ -203,24 +213,27 @@ public class TerminAdd extends Stage {
             addCategoryBtn.setScaleY(1.0);
         });
 
-        // Wenn auf "+" geklickt wird: KategorieAdd öffnen und Ergebnis in Combo übernehmen
+        // WICHTIG: KategorieAdd mit onChanged aufrufen -> StandardAnsicht kann refreshen
         addCategoryBtn.setOnAction(ev -> {
             Stage owner = (getOwner() instanceof Stage) ? (Stage) getOwner() : null;
-            KategorieAdd.show(owner, (String newName) -> {
-                if (newName == null || newName.isBlank()) return;
-                // UI-Update im JavaFX-Thread
-                javafx.application.Platform.runLater(() -> {
-                    if (!kategorieCb.getItems().contains(newName)) {
-                        kategorieCb.getItems().add(newName);
-                    }
-                    kategorieCb.setValue(newName);
-                });
-            });
+
+            KategorieAdd.show(owner,
+                    (String newName) -> {
+                        if (newName == null || newName.isBlank()) return;
+                        javafx.application.Platform.runLater(() -> {
+                            if (!kategorieCb.getItems().contains(newName)) {
+                                kategorieCb.getItems().add(newName);
+                            }
+                            kategorieCb.setValue(newName);
+                        });
+                    },
+                    // NEU: “Kategorien geändert” nach außen melden (falls gesetzt)
+                    this.onKategorieChanged
+            );
         });
 
         HBox katBox = new HBox(8, kategorieCb, addCategoryBtn);
         katBox.setAlignment(Pos.CENTER_LEFT);
-        // ensure combo grows, button keeps fixed size
         HBox.setHgrow(kategorieCb, Priority.ALWAYS);
         kategorieCb.setMaxWidth(Double.MAX_VALUE);
 
@@ -272,11 +285,8 @@ public class TerminAdd extends Stage {
 
         Scene scene = new Scene(root);
         scene.setFill(Color.TRANSPARENT);
-
         scene.setOnKeyPressed(k -> {
-            if (k.getCode() == KeyCode.ESCAPE) {
-                close();
-            }
+            if (k.getCode() == KeyCode.ESCAPE) close();
         });
 
         setScene(scene);
@@ -342,36 +352,41 @@ public class TerminAdd extends Stage {
         }
 
         if (!editMode) {
-            // Neuen Termin anlegen
             Termin neu = new Termin(titel, iStart, iEnd, beschr, chosenKat);
-            if (onSaved != null) {
-                onSaved.accept(neu);
-            }
+            if (onSaved != null) onSaved.accept(neu);
             close();
         } else {
-            // Bestehenden Termin bearbeiten
             boolean ok = MainLogik.terminBearbeiten(existingTermin, titel, iStart, iEnd, beschr, chosenKat);
             if (!ok) {
                 errorLbl.setText("Konnte Termin nicht bearbeiten. Möglicher Konflikt mit anderem Termin.");
                 return;
             }
-
-            if (onSaved != null) {
-                onSaved.accept(existingTermin);
-            }
+            if (onSaved != null) onSaved.accept(existingTermin);
             close();
         }
     }
 
-    // --- Öffnen für "Neu" ---
+    // --- Öffnen für "Neu" (alt kompatibel) ---
     public static void show(Stage owner, LocalDate defaultDate, Consumer<Termin> onSaved) {
-        TerminAdd d = new TerminAdd(owner, defaultDate, onSaved);
+        TerminAdd d = new TerminAdd(owner, defaultDate, onSaved, null);
         d.showAndWait();
     }
 
-    // --- Öffnen für "Edit" ---
+    // --- Öffnen für "Neu" (neu) ---
+    public static void show(Stage owner, LocalDate defaultDate, Consumer<Termin> onSaved, Runnable onKategorieChanged) {
+        TerminAdd d = new TerminAdd(owner, defaultDate, onSaved, onKategorieChanged);
+        d.showAndWait();
+    }
+
+    // --- Öffnen für "Edit" (alt kompatibel) ---
     public static void show(Stage owner, LocalDate defaultDate, Termin existing, Consumer<Termin> onSaved) {
-        TerminAdd d = new TerminAdd(owner, defaultDate, existing, onSaved);
+        TerminAdd d = new TerminAdd(owner, defaultDate, existing, onSaved, null);
+        d.showAndWait();
+    }
+
+    // --- Öffnen für "Edit" (neu) ---
+    public static void show(Stage owner, LocalDate defaultDate, Termin existing, Consumer<Termin> onSaved, Runnable onKategorieChanged) {
+        TerminAdd d = new TerminAdd(owner, defaultDate, existing, onSaved, onKategorieChanged);
         d.showAndWait();
     }
 
@@ -382,12 +397,8 @@ public class TerminAdd extends Stage {
             b.setScaleX(1.03);
             b.setScaleY(1.03);
             String style = b.getStyle();
-            if (style.contains(normalBg)) {
-                b.setStyle(style.replace(normalBg, hoverBg));
-            }
-            if (useTranslate) {
-                b.setTranslateY(-2);
-            }
+            if (style.contains(normalBg)) b.setStyle(style.replace(normalBg, hoverBg));
+            if (useTranslate) b.setTranslateY(-2);
         });
 
         b.setOnMouseExited(e -> {
@@ -395,12 +406,8 @@ public class TerminAdd extends Stage {
             b.setScaleX(1.0);
             b.setScaleY(1.0);
             String style = b.getStyle();
-            if (style.contains(hoverBg)) {
-                b.setStyle(style.replace(hoverBg, normalBg));
-            }
-            if (useTranslate) {
-                b.setTranslateY(0);
-            }
+            if (style.contains(hoverBg)) b.setStyle(style.replace(hoverBg, normalBg));
+            if (useTranslate) b.setTranslateY(0);
         });
     }
 }

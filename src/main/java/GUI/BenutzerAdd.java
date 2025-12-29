@@ -24,8 +24,6 @@ public class BenutzerAdd extends Stage {
     private PasswordField passwordField;
     private TextField rolleField;
     private Label errorLbl;
-
-    // Internes Callback liefert das erstellte Benutzer-Objekt (nullable bei Fehler)
     private final java.util.function.Consumer<Benutzer> onCreated;
 
     // Konstruktor: liefert das erstellte Benutzer-Objekt an den Caller
@@ -35,85 +33,94 @@ public class BenutzerAdd extends Stage {
         initModality(Modality.WINDOW_MODAL);
         initStyle(StageStyle.TRANSPARENT);
 
-        initFields();
-        buildScene("Benutzer hinzufügen");
+        felderInitialisieren();
+        erstelleSzene("Benutzer hinzufügen");
     }
 
-    private void initFields() {
+    private void felderInitialisieren() {
+        // Name-Eingabefeld
         nameField = new TextField();
         nameField.setPromptText("Name");
 
+        // E-Mail-Eingabefeld
         emailField = new TextField();
         emailField.setPromptText("E-Mail");
 
+        // Passwort-Eingabefeld
         passwordField = new PasswordField();
         passwordField.setPromptText("Passwort");
 
+        // Rollenfeld -- irrelevant
         rolleField = new TextField("user");
         rolleField.setPromptText("Rolle (z.B. user)");
 
+        // Fehler-Label
         errorLbl = new Label();
         errorLbl.setStyle("-fx-text-fill: #FF8888; -fx-font-size: 12px;");
     }
 
-    private void buildScene(String titleText) {
+    private void erstelleSzene(String titleText) {
         setTitle(titleText);
 
         Label title = new Label(titleText);
         title.setFont(Font.font(16));
         title.setStyle("-fx-text-fill: #F2F2F2; -fx-font-weight: 600;");
 
+        // Anordnung der Felder in zwei Spalten
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(8);
         grid.setPadding(new Insets(8, 0, 0, 0));
 
-        // --- NEU: ColumnConstraints damit Eingabefelder wachsen ---
         ColumnConstraints col0 = new ColumnConstraints();
-        col0.setMinWidth(120); // Label-Spalte
+        col0.setMinWidth(120);
         ColumnConstraints col1 = new ColumnConstraints();
-        col1.setHgrow(Priority.ALWAYS); // Eingabefeld-Spalte wächst
+        col1.setHgrow(Priority.ALWAYS);
         col1.setPercentWidth(100);
         ColumnConstraints col2 = new ColumnConstraints();
-        col2.setMinWidth(0); // Reserve-Spalte (falls bisher span 2 genutzt wird)
+        col2.setMinWidth(0);
         grid.getColumnConstraints().addAll(col0, col1, col2);
 
+        // Label für Name
         Label lblName = new Label("Name:");
         lblName.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblName, 0, 0);
         grid.add(nameField, 1, 0, 2, 1);
 
+        // Label für E-Mail
         Label lblEmail = new Label("E-Mail:");
         lblEmail.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblEmail, 0, 1);
         grid.add(emailField, 1, 1, 2, 1);
 
+        // Label für Passwort
         Label lblPwd = new Label("Passwort:");
         lblPwd.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblPwd, 0, 2);
         grid.add(passwordField, 1, 2, 2, 1);
 
+        // Label für Rolle
         Label lblRolle = new Label("Rolle:");
         lblRolle.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblRolle, 0, 3);
         grid.add(rolleField, 1, 3, 2, 1);
 
+        // Fehler-Label
         grid.add(errorLbl, 0, 4, 3, 1);
 
-        // --- NEU: Eingabefelder so einstellen, dass sie die verfügbare Breite nutzen ---
         nameField.setMaxWidth(Double.MAX_VALUE);
         emailField.setMaxWidth(Double.MAX_VALUE);
         passwordField.setMaxWidth(Double.MAX_VALUE);
         rolleField.setMaxWidth(Double.MAX_VALUE);
-        // TextArea (Beschreibung) ist nicht vorhanden hier, aber falls später hinzugefügt:
-        // beschreibung.setMaxWidth(Double.MAX_VALUE);
 
         GridPane.setHgrow(nameField, Priority.ALWAYS);
         GridPane.setHgrow(emailField, Priority.ALWAYS);
         GridPane.setHgrow(passwordField, Priority.ALWAYS);
         GridPane.setHgrow(rolleField, Priority.ALWAYS);
 
+        // Abbrechen-Button
         Button cancelBtn = new Button("\u2716  Abbrechen");
+        // Erstellen-Button
         Button saveBtn = new Button("\u2714  Erstellen");
 
         cancelBtn.setPrefWidth(120);
@@ -128,6 +135,7 @@ public class BenutzerAdd extends Stage {
                         "-fx-text-fill: #F6F6F6; " +
                         "-fx-border-color: rgba(255,255,255,0.04);"
         );
+
         saveBtn.setStyle(
                 baseBtn +
                         "-fx-background-color: linear-gradient(#3A6DFF, #2A56D6); " +
@@ -137,20 +145,22 @@ public class BenutzerAdd extends Stage {
         applyHover(cancelBtn, "#3D3D3D", "#2A2A2A", true);
         applyHover(saveBtn, "#4B7BFF", "#3A6DFF", true);
 
+        // Layout
         HBox buttons = new HBox(10, cancelBtn, saveBtn);
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
         VBox root = new VBox(12, title, grid, buttons);
         root.setPadding(new Insets(14));
-        // NEU: Fenster etwas breiter, damit Felder mehr Platz haben (mehr Abstand zum Fensterrand)
         root.setPrefWidth(600);
 
+        // Hintergrund
         root.setStyle("-fx-background-color: #2a2a2d; -fx-background-radius: 10;");
         root.setEffect(new DropShadow(BlurType.GAUSSIAN, Color.rgb(0,0,0,0.45), 14, 0.15, 0, 6));
 
         Scene scene = new Scene(root);
         scene.setFill(Color.TRANSPARENT);
 
+        // ESC schließt den Dialog
         scene.setOnKeyPressed(k -> {
             if (k.getCode() == KeyCode.ESCAPE) {
                 close();
@@ -158,23 +168,15 @@ public class BenutzerAdd extends Stage {
         });
 
         setScene(scene);
+        centerOnScreen();
 
-        // Fenster in die Mitte des Owners setzen
-        if (getOwner() != null) {
-            double w = getOwner().getWidth();
-            double h = getOwner().getHeight();
-            double x = getOwner().getX();
-            double y = getOwner().getY();
-            setX(x + w / 2 - 240);
-            setY(y + h / 2 - 120);
-        }
-
+        // Abbrechen schließt, Erstellen führt handleSave aus
         cancelBtn.setOnAction(e -> close());
         saveBtn.setOnAction(e -> handleSave());
     }
 
-    // --- ERSETZTE Methode: handleSave() ---
     private void handleSave() {
+        // liest Felder, validiert und ruft MainLogik auf
         errorLbl.setText("");
 
         String name = (nameField.getText() != null) ? nameField.getText().trim() : "";
@@ -208,8 +210,8 @@ public class BenutzerAdd extends Stage {
             return;
         }
 
-        // Bei Erfolg: echtes Benutzer-Objekt holen und an Caller liefern
         try {
+            // Callback
             Benutzer createdObj = MainLogik.getBenutzerPerName(name);
             if (this.onCreated != null) {
                 this.onCreated.accept(createdObj);
@@ -218,12 +220,10 @@ public class BenutzerAdd extends Stage {
             System.err.println("Benutzer angelegt, aber Abruf schlug fehl: " + ex.getMessage());
             if (this.onCreated != null) this.onCreated.accept(null);
         }
-
         close();
     }
 
-    // Hover-Helfer (wie in TerminAdd)
-    private void applyHover(Button b, String hoverBg, String normalBg, boolean useTranslate) {
+    private void applyHover(Button b, String hoverBg, String normalBg, boolean useTranslate) {  // Hover wie sonst auch
         b.setOnMouseEntered(e -> {
             b.setCursor(Cursor.HAND);
             b.setScaleX(1.03);
@@ -246,7 +246,6 @@ public class BenutzerAdd extends Stage {
         });
     }
 
-    // Anzeige: Callback liefert das erstellte Benutzer-Objekt
     public static void show(Stage owner, java.util.function.Consumer<Benutzer> onCreated) {
         BenutzerAdd d = new BenutzerAdd(owner, onCreated);
         d.showAndWait();
