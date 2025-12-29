@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.time.Instant;
 
-// @Luis: Weiß nicht ob man die braucht, und wenn ja für was
+// @Luis: Weiß nicht ob man die braucht, und wenn ja wofür
 // --- NEU: JDBC-Importe für DB-Persistenz ---
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -18,6 +18,10 @@ import java.util.HashMap;
 
 public class MainLogik {
 
+    static{
+        Demos.demo();
+    }
+
     private static String currentUserName = Demos.getDemoFamilie().getBenutzerNamen().get(0); // vllt noch beim programmstart abfrage
 
     static {
@@ -25,9 +29,8 @@ public class MainLogik {
         // @Luis was auch immer persisitieren ist
 
         // Demo-Daten initialisieren
-        Demos.demo();
         try {
-            persistDemosToDB();
+            persistDemosToDB();  // riesen Methode unten
         } catch (Throwable ex) {
             System.err.println("Warnung: Persistieren der Demos in die DB fehlgeschlagen: " + ex.getMessage());
         }
@@ -56,7 +59,7 @@ public class MainLogik {
     public static List<Termin> getTermineFuerDatumFuerNutzer(LocalDate date, String benutzerName) {
         if (Demos.getDemoFamilie() == null) Demos.demo();
         if (benutzerName == null) return new ArrayList<>();
-        Benutzer b = MainLogik.getBenutzerByName(benutzerName);
+        Benutzer b = MainLogik.getBenutzerPerName(benutzerName);
         if (b != null) {
             return b.getKalender().getTermineDatum(date);
         } else {
@@ -97,12 +100,16 @@ public class MainLogik {
     }
 
     // Anlegen eines Benutzers in der Demo-Familie
-    public static boolean createBenutzer(String name, String email, String password, String rolle) {
+    public static boolean benutzerErstellen(String name, String email, String password, String rolle) {
         if (name == null || name.isBlank()) return false;
         try {
             Familie fam = Demos.getDemoFamilie(); // Da Familie in Demos erstellt wurde
             String korrekteRolle = (rolle == null || rolle.isBlank()) ? "Kind" : rolle.trim();  // Standard Rolle "Kind"
-            return fam.erstelleBenutzer(name, email, password, korrekteRolle);
+            boolean geklappt =  fam.erstelleBenutzer(name, email, password, korrekteRolle);
+            if (geklappt) {
+                // @Luis: hier müsste der Benutzer auch in die DB geschrieben werden
+            }
+            return geklappt;
         } catch (Throwable ex) {
             System.err.println("createBenutzer fehlgeschlagen: " + ex.getMessage());
             return false;
@@ -110,7 +117,7 @@ public class MainLogik {
     }
 
     // Liefert Benutzer nach Namen
-    public static Benutzer getBenutzerByName(String name) {
+    public static Benutzer getBenutzerPerName(String name) {
         if (Demos.getDemoFamilie() == null) Demos.demo(); // Sicherstellen, dass Demo-Familie existiert
         if (name == null) return null;
         for (Benutzer b : Demos.getDemoFamilie().getMitglieder()) {
@@ -132,26 +139,24 @@ public class MainLogik {
     }
 
     // Liefert Kategorie anhand des Namens
-    public static Kategorie getKategorieByName(String name) {
+    public static Kategorie getKategoriePerName(String name) {
         try {
             Familie fam = Demos.getDemoFamilie();
-            if (fam == null) return null;
             return fam.getKategorieByName(name);
         } catch (Throwable ex) {
-            System.err.println("getKategorieByName failed: " + ex.getMessage());
+            System.err.println("getKategoriePerName failed: " + ex.getMessage());
             return null;
         }
     }
 
     // Fügt einen Termin dem Kalender des aktuellen Benutzers hinzu
-    public static void addTermin(Termin t) {
-        if (t == null) return;
+    public static void terminHinzufuegen(Termin t) {
 
-        // 1) in ram hinzufügen
-        Benutzer b = getBenutzerByName(currentUserName);
+        // 1) im Programm lokal speichern
+        Benutzer b = getBenutzerPerName(currentUserName);
         b.getKalender().terminHinzufuegen(t);
 
-        // @Luis sieht für mich nach unnötig viel aus. vllt ausnahmen löschen
+        // @Luis b+c+d sieht für mich nach unnötig viel aus. vllt ausnahmen löschen - es soll ja nur dem termin der erstellt wird, auch in die db geschrieben werden
         // 2) Persistenz: versuche, den Termin in die DB zu schreiben (robust / optional)
         try (Connection conn = Database.getConnection()) {
             conn.setAutoCommit(false);
@@ -238,29 +243,23 @@ public class MainLogik {
         }
     }
 
-    // Wrapper zum Bearbeiten eines Termins im Kalender des aktuellen Benutzers ---
-    public static boolean editTermin(Termin original, String neuerTitel, Instant neuerStart, Instant neuesEnde, String neueBeschreibung, Kategorie neueKategorie) {
+    // Bearbeiten eines Termins
+    public static boolean terminBearbeiten(Termin original, String neuerTitel, Instant neuerStart, Instant neuesEnde, String neueBeschreibung, Kategorie neueKategorie) {
         try {
-            if (original == null) return false;
-            if (currentUserName == null) return false;
-            Benutzer b = getBenutzerByName(currentUserName);
-            if (b == null) return false;
-            // Kalender.terminBearbeiten führt the eigentliche Bearbeitung durch
+            Benutzer b = getBenutzerPerName(currentUserName);
             return b.getKalender().terminBearbeiten(original, neuerTitel, neuerStart, neuesEnde, neueBeschreibung, neueKategorie);
+            // @Luis hier müsste ein DB-Update-Aufruf hin.
         } catch (Throwable ex) {
-            // bei Fehlern false zurückgeben
             return false;
         }
     }
 
-    // --- NEU: Wrapper zum Löschen eines Termins im Kalender des aktuellen Benutzers ---
-    public static boolean deleteTermin(Termin t) {
-        if (t == null || currentUserName == null) return false;
+    // Löschen eines Termins
+    public static boolean terminLoeschen(Termin t) {
         try {
-            Benutzer b = getBenutzerByName(currentUserName);
-            if (b == null) return false;
+            Benutzer b = getBenutzerPerName(currentUserName);
             b.getKalender().terminLoeschen(t);
-            // Falls Persistenz/DB genutzt wird, würde hier ein DB-Delete-Aufruf ergänzt werden.
+            // @Luis hier müsste ein DB-Delete-Aufruf hin.
             return true;
         } catch (Throwable ex) {
             System.err.println("Löschen fehlgeschlagen: " + ex.getMessage());
@@ -268,47 +267,34 @@ public class MainLogik {
         }
     }
 
-    // --- NEU: Prüft, ob ein Termin mit den Terminen des aktuell angemeldeten Benutzers kollidiert ---
-    public static boolean hasConflictForCurrentUser(Termin t) {
+    // Prüft, ob ein Termin mit den Terminen des aktuell angemeldeten Benutzers kollidiert
+    public static boolean hatKonflikt(Termin t) {
         if (t == null || currentUserName == null) return false;
         try {
-            Benutzer b = getBenutzerByName(currentUserName);
+            Benutzer b = getBenutzerPerName(currentUserName);
             if (b == null) return false;
             return b.getKalender().konflikt(t);
         } catch (Throwable ex) {
-            System.err.println("hasConflictForCurrentUser failed: " + ex.getMessage());
+            System.err.println("Konfliktüberprüfung fehlgeschlagen: " + ex.getMessage());
             return false;
         }
     }
 
-    // Listener für UI, wird aufgerufen, wenn eine neue Kategorie erstellt wurde (liefert Namen)
-    private static java.util.function.Consumer<String> categoryAddedListener;
-
-    public static void setCategoryAddedListener(java.util.function.Consumer<String> listener) {
-        categoryAddedListener = listener;
-    }
-
-    // --- NEU: Wrapper zum Erstellen einer Kategorie auf Familien-Ebene ---
-    public static boolean createKategorie(String name, String farbe) {
+    // Erstellen einer Kategorie
+    public static boolean kategorieErstellen(String name, String farbe) {
         if (name == null || name.isBlank()) return false;
         try {
             Familie fam = Demos.getDemoFamilie();
             if (fam == null) return false;
-            boolean created = fam.erstelleKategorie(name.trim(), farbe == null ? "#4A90E2" : farbe.trim());
-            if (created) {
-                try { if (categoryAddedListener != null) categoryAddedListener.accept(name.trim()); } catch (Throwable ignore) {}
-            }
-            return created;
+            return fam.erstelleKategorie(name.trim(), farbe == null ? "#4A90E2" : farbe.trim());
         } catch (Throwable ex) {
-            System.err.println("createKategorie fehlgeschlagen: " + ex.getMessage());
+            System.err.println("Kategorie erstellen fehlgeschlagen: " + ex.getMessage());
             return false;
         }
     }
 
-    /**
-     * Persistiert die Demo-Daten (Benutzer, Kategorien, Termine) in die relationale DB.
-     * Verhalten: defensiv, Fehler werden geloggt, sollen aber den Start nicht verhindern.
-     */
+    // @Luis kein Plan was hier passiert, aber schreibt die Demo-Daten in die DB, falls behalten, verhindern, dass demos bei jedem Start neu reingeschrieben werden
+    // Schreibt die Demo-Daten in die Datenbank
     private static void persistDemosToDB() {
         try (Connection conn = Database.getConnection()) {
             conn.setAutoCommit(false);
@@ -362,7 +348,7 @@ public class MainLogik {
 
                 for (String name : names) {
                     try {
-                        Benutzer b = getBenutzerByName(name);
+                        Benutzer b = getBenutzerPerName(name);
                         if (b == null) continue;
 
                         // --- Person: prüfen / anlegen (robust: SELECT -> INSERT -> SELECT -> ggf. UPDATE) ---
@@ -463,7 +449,7 @@ public class MainLogik {
                             if (personId != null) personCache.put(b.getName(), personId);
                         }
 
-                        // --- Termine des Benutzers: prüfen / anlegen ---
+                        // Termine des Benutzers: prüfen / anlegen
                         Kalender kal = b.getKalender();
                         if (kal != null) {
                             for (Termin t : kal.getTermine()) {
@@ -526,25 +512,14 @@ public class MainLogik {
         }
     }
 
-    // --- NEU: Hilfsmethode zur Normalisierung von Rollen für DB-Insert (nur ADMIN oder KIND zulassen) ---
+    /* @Luis: Die Methode ist eigentlich unnötig, da die Rolle schon beim Anlegen des Benutzers bereinigt wird.
+    Rollen haben wir jetzt eh nicht richtig umgesetzt, also können die auch in die Datenbank geschrieben werden wie sie sind. */
+    // Hilfsmethode zur Normalisierung von Rollen für DB-Insert (nur ADMIN oder KIND zulassen)
     private static String sanitizeRole(String rolle) {
-        if (rolle == null) return "KIND";
+        if (rolle == null) return "Kind";
         String r = rolle.trim().toUpperCase();
         if ("ADMIN".equals(r)) return "ADMIN";
         // nur zulässige Werte sind ADMIN oder KIND -> alles andere als KIND behandeln
-        return "KIND";
-    }
-
-    // Helfer: fügt Demo-Kategorien in die Familie falls noch nicht vorhanden
-    private static void addKategorieIfMissingToFamily(String name, String farbe) {
-        try {
-            Familie fam = Demos.getDemoFamilie();
-            if (fam == null) return;
-            if (!fam.kategorieDoppelt(name)) {
-                fam.kategorieHinzufuegen(new Kategorie(name, farbe));
-            }
-        } catch (Throwable ex) {
-            System.err.println("addKategorieIfMissingToFamily failed: " + ex.getMessage());
-        }
+        return "Kind";
     }
 }

@@ -32,9 +32,9 @@ public class Demos {
         LocalDate futureDate = today.plusDays(4); // Beispiel in 4 Tagen, um Demo-Termine aktuell zu halten
 
         // Benutzer-Objekte holen
-        Benutzer max = MainLogik.getBenutzerByName("Max Mustermann");
-        Benutzer anna = MainLogik.getBenutzerByName("Anna Müller");
-        Benutzer chris = MainLogik.getBenutzerByName("Chris Beispiel");
+        Benutzer max = MainLogik.getBenutzerPerName("Max Mustermann");
+        Benutzer anna = MainLogik.getBenutzerPerName("Anna Müller");
+        Benutzer chris = MainLogik.getBenutzerPerName("Chris Beispiel");
 
         // Termine für Max (zwei Termine heute) -- eig muss das einfacher sein, indem man die Termine über vorhandene methoden hinzufügt
         if (max != null) {

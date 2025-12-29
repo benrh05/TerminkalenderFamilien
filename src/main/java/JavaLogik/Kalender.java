@@ -35,9 +35,13 @@ public class Kalender {
     }
 
     public boolean konflikt(Termin neuerTermin) {
-        for (Termin bestehenderTermin : termine) {   // alle bestehenden Termine prüfen
+        for (Termin bestehenderTermin : termine) {
+            if (neuerTermin.getStart().equals(bestehenderTermin.getStart())
+                && neuerTermin.getEnde().equals(bestehenderTermin.getEnde())) {
+                continue;
+            }
             if (neuerTermin.getStart().isBefore(bestehenderTermin.getEnde()) &&
-                neuerTermin.getEnde().isAfter(bestehenderTermin.getStart())) {
+                    neuerTermin.getEnde().isAfter(bestehenderTermin.getStart())) {
                 return true; // Konflikt gefunden
             }
         }

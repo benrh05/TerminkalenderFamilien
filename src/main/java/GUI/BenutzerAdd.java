@@ -197,7 +197,7 @@ public class BenutzerAdd extends Stage {
 
         boolean created = false;
         try {
-            created = MainLogik.createBenutzer(name, email, pwd, rolle);
+            created = MainLogik.benutzerErstellen(name, email, pwd, rolle);
         } catch (Throwable ex) {
             created = false;
             System.err.println("Fehler beim Anlegen des Benutzers: " + ex.getMessage());
@@ -210,7 +210,7 @@ public class BenutzerAdd extends Stage {
 
         // Bei Erfolg: echtes Benutzer-Objekt holen und an Caller liefern
         try {
-            Benutzer createdObj = MainLogik.getBenutzerByName(name);
+            Benutzer createdObj = MainLogik.getBenutzerPerName(name);
             if (this.onCreated != null) {
                 this.onCreated.accept(createdObj);
             }

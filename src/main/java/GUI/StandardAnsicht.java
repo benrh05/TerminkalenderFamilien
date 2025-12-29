@@ -157,7 +157,7 @@ public class StandardAnsicht extends Application {
                 TerminAdd.show(primaryStageRef, LocalDate.now(), (Termin neu) -> {
                     if (neu == null) return;
                     try {
-                        boolean conflict = MainLogik.hasConflictForCurrentUser(neu);
+                        boolean conflict = MainLogik.hatKonflikt(neu);
                         if (conflict) {
                             javafx.scene.control.Alert confirm = new javafx.scene.control.Alert(
                                     javafx.scene.control.Alert.AlertType.CONFIRMATION,
@@ -174,7 +174,7 @@ public class StandardAnsicht extends Application {
                         }
 
                         // Entweder kein Konflikt oder Nutzer hat bestätigt
-                        MainLogik.addTermin(neu);
+                        MainLogik.terminHinzufuegen(neu);
                     } catch (Throwable ex) {
                         System.out.println("Konnte Termin nicht an MainLogik übergeben: " + ex.getMessage());
                         javafx.scene.control.Alert err = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Termin konnte nicht erstellt werden.");
@@ -342,18 +342,6 @@ public class StandardAnsicht extends Application {
             boolean showing = this.categoryPanel.isVisible();
             this.categoryPanel.setVisible(!showing);
             this.categoryPanel.setManaged(!showing);
-        });
-
-        // Register UI listener, damit Kategorien, die z.B. aus KategorieAdd erstellt werden,
-        // sofort in der UI sichtbar werden.
-        MainLogik.setCategoryAddedListener((String newName) -> {
-            Platform.runLater(() -> {
-                try {
-                    refreshCategoryPanel();
-                } catch (Throwable ex) {
-                    System.err.println("Fehler beim Aktualisieren der Kategorien: " + ex.getMessage());
-                }
-            });
         });
 
         // --- CENTER: CALENDAR GRID (Monatsansicht) ---
@@ -740,6 +728,7 @@ public class StandardAnsicht extends Application {
     private void refreshCategoryPanel() {
         if (this.categoryPanel == null) return;
         this.categoryPanel.getChildren().clear();
+
         try {
             // "Alle" Button - setzt Filter zurück
             Button allBtn = new Button("Alle");
@@ -749,7 +738,7 @@ public class StandardAnsicht extends Application {
                 selectedCategoryName = null;
                 this.categoryPanel.setVisible(false);
                 this.categoryPanel.setManaged(false);
-                // neu rendern
+
                 if (isDayView) {
                     showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
                 } else {
@@ -758,46 +747,78 @@ public class StandardAnsicht extends Application {
             });
             this.categoryPanel.getChildren().add(allBtn);
 
+            // Kategorien laden
             List<String> kategorien = MainLogik.getKategorienNamen();
-            if (kategorien == null) return;
-            for (String k : kategorien) {
-                Button kb = new Button(k);
-                kb.setPrefWidth(Double.MAX_VALUE);
-                kb.setStyle("-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-                kb.setOnMouseEntered(ev -> {
-                    kb.setCursor(Cursor.HAND);
-                    kb.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-                });
-                kb.setOnMouseExited(ev -> {
-                    kb.setCursor(Cursor.DEFAULT);
-                    // restore selection style or base
-                    boolean sel = (selectedCategoryName != null && selectedCategoryName.equals(k));
-                    kb.setStyle(sel ? "-fx-background-color: rgba(75,123,255,0.18); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;" :
-                                      "-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-                });
-                kb.setOnAction(ev -> {
-                    // Toggle selection: bei erneutem Klick entfernen
-                    if (k.equals(selectedCategoryName)) {
-                        selectedCategoryName = null;
-                    } else {
-                        selectedCategoryName = k;
-                    }
-                    this.categoryPanel.setVisible(false);
-                    this.categoryPanel.setManaged(false);
+            if (kategorien != null) {
+                for (String k : kategorien) {
+                    Button kb = new Button(k);
+                    kb.setPrefWidth(Double.MAX_VALUE);
 
-                    // neu rendern mit Filter
-                    if (isDayView) {
-                        showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
-                    } else {
-                        renderCalendar();
+                    boolean sel = (selectedCategoryName != null && selectedCategoryName.equals(k));
+                    kb.setStyle(sel
+                            ? "-fx-background-color: rgba(75,123,255,0.18); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;"
+                            : "-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;"
+                    );
+
+                    kb.setOnMouseEntered(ev -> {
+                        kb.setCursor(Cursor.HAND);
+                        kb.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
+                    });
+
+                    kb.setOnMouseExited(ev -> {
+                        kb.setCursor(Cursor.DEFAULT);
+                        boolean selected = (selectedCategoryName != null && selectedCategoryName.equals(k));
+                        kb.setStyle(selected
+                                ? "-fx-background-color: rgba(75,123,255,0.18); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;"
+                                : "-fx-background-color: transparent; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10;"
+                        );
+                    });
+
+                    kb.setOnAction(ev -> {
+                        // Toggle selection: bei erneutem Klick entfernen
+                        if (k.equals(selectedCategoryName)) selectedCategoryName = null;
+                        else selectedCategoryName = k;
+
+                        this.categoryPanel.setVisible(false);
+                        this.categoryPanel.setManaged(false);
+
+                        if (isDayView) {
+                            showDayView(currentDisplayedDate != null ? currentDisplayedDate : LocalDate.now());
+                        } else {
+                            renderCalendar();
+                        }
+                    });
+
+                    this.categoryPanel.getChildren().add(kb);
+                }
+            }
+
+            // --- Add-Button für neue Kategorie (öffnet KategorieAdd und refreshCategoryPanel bei Erfolg) ---
+            Button addCatBtn = new Button("+ Neue Kategorie");
+            addCatBtn.setPrefWidth(Double.MAX_VALUE);
+            addCatBtn.setStyle("-fx-background-color: #333336; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10; -fx-background-radius:6;");
+            addCatBtn.setOnMouseEntered(ev -> {
+                addCatBtn.setCursor(Cursor.HAND);
+                addCatBtn.setStyle("-fx-background-color: #3A3A3D; -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10; -fx-background-radius:6;");
+            });
+            addCatBtn.setOnMouseExited(ev -> {
+                addCatBtn.setCursor(Cursor.DEFAULT);
+                addCatBtn.setStyle("-fx-background-color: #333336; -fx-text-fill: #E8E8E8; -fx-alignment: center-left; -fx-padding: 6 10 6 10; -fx-background-radius:6;");
+            });
+
+            addCatBtn.setOnAction(ev -> {
+                KategorieAdd.show(primaryStageRef, (String createdName) -> {
+                    // wenn Kategorie erstellt wurde -> Panel neu aufbauen
+                    try {
+                        refreshCategoryPanel();
+                    } catch (Throwable ex) {
+                        System.err.println("Fehler beim Aktualisieren der Kategorien nach Erstellung: " + ex.getMessage());
                     }
                 });
-                // visuelle Markierung, falls ausgewählt
-                if (selectedCategoryName != null && selectedCategoryName.equals(k)) {
-                    kb.setStyle("-fx-background-color: rgba(75,123,255,0.18); -fx-text-fill: #FFFFFF; -fx-alignment: center-left; -fx-padding: 6 10 6 10;");
-                }
-                this.categoryPanel.getChildren().add(kb);
-            }
+            });
+
+            this.categoryPanel.getChildren().add(addCatBtn);
+
         } catch (Throwable ex) {
             System.err.println("refreshCategoryPanel failed: " + ex.getMessage());
         }

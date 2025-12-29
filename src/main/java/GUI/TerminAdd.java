@@ -338,7 +338,7 @@ public class TerminAdd extends Stage {
         String selectedKatName = kategorieCb.getValue();
         Kategorie chosenKat = null;
         if (selectedKatName != null && !selectedKatName.isBlank()) {
-            chosenKat = MainLogik.getKategorieByName(selectedKatName);
+            chosenKat = MainLogik.getKategoriePerName(selectedKatName);
         }
 
         if (!editMode) {
@@ -350,12 +350,7 @@ public class TerminAdd extends Stage {
             close();
         } else {
             // Bestehenden Termin bearbeiten
-            if (existingTermin == null) {
-                errorLbl.setText("Kein bestehender Termin zum Bearbeiten.");
-                return;
-            }
-
-            boolean ok = MainLogik.editTermin(existingTermin, titel, iStart, iEnd, beschr, chosenKat);
+            boolean ok = MainLogik.terminBearbeiten(existingTermin, titel, iStart, iEnd, beschr, chosenKat);
             if (!ok) {
                 errorLbl.setText("Konnte Termin nicht bearbeiten. Möglicher Konflikt mit anderem Termin.");
                 return;

@@ -26,14 +26,22 @@ public class KategorieAdd extends Stage {
     private TextField colorHexField;
     private Label errorLbl;
     private final Consumer<String> onCreated;
+    private final Runnable onChanged; // neu: optionaler Callback, damit Aufrufer (z.B. StandardAnsicht) refreshen kann
 
-    public KategorieAdd(Stage owner, Consumer<String> onCreated) {
+    // Neuer Konstruktor mit onChanged
+    public KategorieAdd(Stage owner, Consumer<String> onCreated, Runnable onChanged) {
         this.onCreated = onCreated;
+        this.onChanged = onChanged;
         initOwner(owner);
         initModality(Modality.WINDOW_MODAL);
         initStyle(StageStyle.TRANSPARENT);
         initFields();
         buildScene("Kategorie erstellen");
+    }
+
+    // Beibehalten der alten Signatur als delegierender Konstruktor für Kompatibilität
+    public KategorieAdd(Stage owner, Consumer<String> onCreated) {
+        this(owner, onCreated, null);
     }
 
     private void initFields() {
@@ -158,7 +166,7 @@ public class KategorieAdd extends Stage {
         // Verwende MainLogik, damit Kategorie zentral beim aktuellen Benutzer gespeichert wird
         boolean ok = false;
         try {
-            ok = MainLogik.createKategorie(name, hex);
+            ok = MainLogik.kategorieErstellen(name, hex);
         } catch (Throwable ex) {
             System.err.println("Fehler beim Erstellen der Kategorie: " + ex.getMessage());
             ok = false;
@@ -173,6 +181,12 @@ public class KategorieAdd extends Stage {
         if (this.onCreated != null) {
             try { this.onCreated.accept(name); } catch (Exception ignored) {}
         }
+
+        // Neu: falls ein onChanged-Callback übergeben wurde, informieren (z.B. StandardAnsicht.refreshCategoryPanel)
+        if (this.onChanged != null) {
+            try { this.onChanged.run(); } catch (Exception ignored) {}
+        }
+
         close();
     }
 
@@ -203,9 +217,15 @@ public class KategorieAdd extends Stage {
         });
     }
 
-    // Static show convenience
+    // Static show convenience - kompatibel
     public static void show(Stage owner, Consumer<String> onCreated) {
-        KategorieAdd d = new KategorieAdd(owner, onCreated);
+        KategorieAdd d = new KategorieAdd(owner, onCreated, null);
+        d.showAndWait();
+    }
+
+    // Neue Overload: mit onChanged Runnable
+    public static void show(Stage owner, Consumer<String> onCreated, Runnable onChanged) {
+        KategorieAdd d = new KategorieAdd(owner, onCreated, onChanged);
         d.showAndWait();
     }
 }

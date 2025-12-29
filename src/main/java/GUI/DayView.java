@@ -368,7 +368,7 @@ public class DayView extends VBox {
             });
 
             menuBtn.setOnAction(evt -> {
-                boolean ok = MainLogik.deleteTermin(t);
+                boolean ok = MainLogik.terminLoeschen(t);
                 if (ok) {
                     List<Termin> newList = MainLogik.getTermineFuerDatum(this.currentDate);
                     this.show(this.currentDate, newList);
