@@ -32,7 +32,6 @@ import java.util.Set;
 // zusätzliche Importe für die Uhr
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
-import javafx.util.Duration;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 import javafx.geometry.Side;
@@ -247,8 +246,14 @@ public class StandardAnsicht extends Application {
         searchField.setPromptText("Suche...");
         searchField.setPrefWidth(360);
         Button searchBtn = new Button("\uD83D\uDD0D"); // 🔍
-        Button profileBtn = new Button("\uD83D\uDC64"); // 👤
-         profileBtn.setPrefSize(44, 36);
+
+        // PROFILE BUTTON: jetzt mit klares Text/Symbol, Breite so dass Text passt
+        Button profileBtn = new Button();
+        profileBtn.setPrefHeight(36);
+        profileBtn.setPrefWidth(110);
+         profileBtn.setStyle(
+                 "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
+                         "-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 6 8 6 8; -fx-text-fill: #F2F2F2;");
 
         // Erstelle mtBtn als Instanz-Button (Text initial "Heute")
          this.mtBtn = new Button("Heute");
@@ -282,8 +287,8 @@ public class StandardAnsicht extends Application {
 
         // Toggle: zeigt entweder nur Termine des aktuellen Benutzers oder alle Termine der Familie
         profileBtn.setOnAction(e -> {
-            boolean newState = !MainLogik.isShowAllFamilyTermine();
-            MainLogik.setShowAllFamilyTermine(newState);
+            boolean newState = !MainLogik.getZeigeAlleTermine();
+            MainLogik.setAlleTermineAnzeigen(newState);
             updateProfileButtonVisual(profileBtn);
             // Neu rendern der aktuell sichtbaren Ansicht
            try {
@@ -522,7 +527,7 @@ public class StandardAnsicht extends Application {
                 // ----- Balken nur für Termine, die (falls gesetzt) zur selectedCategoryName gehören -----
                 if (dayNum >= 1 && dayNum <= daysInMonth) {
                     LocalDate thisDate = currentMonth.withDayOfMonth(dayNum);
-                    List<Termin> termine = MainLogik.getTermineForDate(thisDate);
+                    List<Termin> termine = MainLogik.getTermineFuerDatum(thisDate);
                     List<Termin> visibleTermine = new ArrayList<>();
                     if (termine != null) {
                         if (selectedCategoryName == null) {
@@ -576,7 +581,7 @@ public class StandardAnsicht extends Application {
                             // Ersetze:
                             // Label tlabel = new Label(t.getTitel());
                             String displayTitle = t.getTitel() == null ? "" : t.getTitel();
-                            if (MainLogik.isShowAllFamilyTermine()) {
+                            if (MainLogik.getZeigeAlleTermine()) {
                                 String owner = findOwnerNameForTermin(t);
                                 if (owner != null && !owner.isBlank()) {
                                     displayTitle = owner + ": " + displayTitle;
@@ -642,7 +647,7 @@ public class StandardAnsicht extends Application {
     private void showDayView(LocalDate date) {
         this.currentDisplayedDate = date;
 
-        List<Termin> termine = MainLogik.getTermineForDate(date);
+        List<Termin> termine = MainLogik.getTermineFuerDatum(date);
         List<Termin> visible = new ArrayList<>();
         if (termine != null) {
             if (selectedCategoryName == null) {
@@ -800,7 +805,9 @@ public class StandardAnsicht extends Application {
 
     // helper: passt Profil-Button-Style und Tooltip an den aktuellen Toggle-Zustand an
     private void updateProfileButtonVisual(Button profileBtn) {
-        if (MainLogik.isShowAllFamilyTermine()) {
+        if (profileBtn == null) return;
+        if (MainLogik.getZeigeAlleTermine()) {
+            profileBtn.setText("\uD83D\uDC65  Alle"); // group icon + text
             profileBtn.setStyle(
                     "-fx-background-color: linear-gradient(#3A6DFF, #2A56D6); " +
                     "-fx-border-color: rgba(255,255,255,0.12); " +
@@ -808,6 +815,7 @@ public class StandardAnsicht extends Application {
             );
             profileBtn.setTooltip(new javafx.scene.control.Tooltip("Alle Termine anzeigen (An/Aus)"));
         } else {
+            profileBtn.setText("\uD83D\uDC64  Ich"); // person icon + text
             profileBtn.setStyle(
                     "-fx-background-color: #2A2A2A; -fx-border-color: rgba(255,255,255,0.07); " +
                     "-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 6 8 6 8; -fx-text-fill: #F2F2F2;"
@@ -836,7 +844,7 @@ public class StandardAnsicht extends Application {
 
             for (Benutzer b : members) {
                 if (b == null || b.getKalender() == null) continue;
-                List<Termin> terms = b.getKalender().getTermineForDate(targetDate);
+                List<Termin> terms = b.getKalender().getTermineDatum(targetDate);
                 if (terms == null || terms.isEmpty()) continue;
                 for (Termin t : terms) {
                     if (t == null || t.getStart() == null) continue;

@@ -7,7 +7,7 @@ public class Termin {
     private static int nextId = 1;
     private final int id;
     private String titel;
-    private Instant start;    // Instant zählt Zeit seit 1970
+    private Instant start;    // Instant zählt Zeit
     private Instant ende;
     private String beschreibung;
     private Kategorie kategorie;

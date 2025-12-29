@@ -357,7 +357,7 @@ public class TerminAdd extends Stage {
 
             boolean ok = MainLogik.editTermin(existingTermin, titel, iStart, iEnd, beschr, chosenKat);
             if (!ok) {
-                errorLbl.setText("Konnte Termin nicht bearbeiten.");
+                errorLbl.setText("Konnte Termin nicht bearbeiten. Möglicher Konflikt mit anderem Termin.");
                 return;
             }
 

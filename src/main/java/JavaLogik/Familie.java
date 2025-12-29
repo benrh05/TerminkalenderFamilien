@@ -7,13 +7,13 @@ public class Familie {
     private String familienName;
     private List<Benutzer> mitglieder;
 
+    // neu: Kategorien auf Familien-Ebene
+    private List<Kategorie> kategorien;
+
     public Familie(String familienName) {
         this.familienName = familienName;
         this.mitglieder = new ArrayList<Benutzer>();
-    }
-
-    public static Familie erstelleFamilie(String familienName) {
-        return new Familie(familienName);
+        this.kategorien = new ArrayList<Kategorie>();
     }
 
     public String getFamilienName() {
@@ -35,7 +35,6 @@ public class Familie {
 
     public boolean erstelleBenutzer(String name, String email, String password, String rolle) {
         if (benutzernameExistiert(name)) {
-            //GUI.fehlermeldungAnzeigen();  muss noch in gui geschrieben werden
             return false; // Name existiert bereits
         }
         Benutzer benutzer = new Benutzer(name, email, password, rolle);
@@ -47,26 +46,6 @@ public class Familie {
         this.mitglieder.add(benutzer);
     }
 
-    public void benutzerLoeschen(Benutzer benutzer) {
-        this.mitglieder.remove(benutzer);
-    }
-
-    public void setFamilienName(String familienName) {    // eventuell wegmachen und final machen
-        this.familienName = familienName;
-    }
-
-    public boolean benutzerBearbeiten(Benutzer benutzer, String neuerName, String neueEmail, String neuesPasswort, String neueRolle) {
-        if (benutzernameExistiert(neuerName)) {
-            //GUI.fehlermeldungAnzeigen();  muss noch in gui geschrieben werden
-            return false; // Name existiert bereits
-        }
-        benutzer.setName(neuerName);
-        benutzer.setEmail(neueEmail);
-        benutzer.setPassword(neuesPasswort);
-        benutzer.setRolle(neueRolle);
-        return true;
-    }
-
     public List<String> getBenutzerNamen() {
         List<String> namen = new ArrayList<>();
         for (Benutzer benutzer : mitglieder) {
@@ -75,5 +54,47 @@ public class Familie {
         return namen;
     }
 
+    public List<Kategorie> getKategorien() {
+        return kategorien;
+    }
+
+    public List<String> getKategorienNamen() {
+        List<String> namen = new ArrayList<>();
+        for (Kategorie k : kategorien) {
+            namen.add(k.getName());
+        }
+        return namen;
+    }
+
+    public void kategorieHinzufuegen(Kategorie kategorie) {
+        if (kategorie == null) return;
+        if (!kategorieDoppelt(kategorie.getName())) {
+            kategorien.add(kategorie);
+        }
+    }
+
+    public Kategorie getKategorieByName(String name) {
+        if (name == null) return null;
+        for (Kategorie k : kategorien) {
+            if (name.equals(k.getName())) return k;
+        }
+        return null;
+    }
+
+    public boolean kategorieDoppelt(String name) {
+        if (name == null) return false;
+        for (Kategorie k : kategorien) {
+            if (k.getName() != null && k.getName().equals(name)) return true;
+        }
+        return false;
+    }
+
+    public boolean erstelleKategorie(String name, String farbe) {
+        if (name == null || name.isBlank()) return false;
+        if (kategorieDoppelt(name)) return false;
+        Kategorie kategorie = new Kategorie(name, farbe);
+        kategorien.add(kategorie);
+        return true;
+    }
 
 }

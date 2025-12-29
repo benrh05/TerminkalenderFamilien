@@ -9,6 +9,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
@@ -38,6 +39,9 @@ public class DayView extends VBox {
     private int startHour = 8;
     private int endHour = 20;
     private double minuteHeight = 1.0; // 1 px pro Minute => 60px pro Stunde
+
+    // für sauberen Gleichlauf zwischen Zeitspalte / Raster / Terminen
+    private static final double TOP_BOTTOM_OFFSET = 4.0; // entspricht dem Padding der timeColumn (oben/unten)
 
     public DayView() {
         setSpacing(12);
@@ -78,14 +82,20 @@ public class DayView extends VBox {
         timeColumn = new VBox();
         timeColumn.setSpacing(0);
         timeColumn.setPrefWidth(60);
-        timeColumn.setPadding(new Insets(4, 8, 4, 0));
+        timeColumn.setPadding(new Insets(TOP_BOTTOM_OFFSET, 8, TOP_BOTTOM_OFFSET, 0));
 
         timelineBackground = new VBox();
         timelineBackground.setSpacing(0);
         timelineBackground.setFillWidth(true);
 
+        // Gleicher vertikaler Offset wie timeColumn
+        timelineBackground.setPadding(new Insets(TOP_BOTTOM_OFFSET, 0, TOP_BOTTOM_OFFSET, 0));
+
         eventLayer = new Pane();
         eventLayer.setPickOnBounds(false);
+
+        // Termine starten auf derselben Höhe wie Raster/TimeColumn
+        eventLayer.setTranslateY(TOP_BOTTOM_OFFSET);
 
         // initiale Timeline (wird später durch show(...) überschrieben)
         rebuildTimeline(startHour, endHour);
@@ -95,15 +105,37 @@ public class DayView extends VBox {
         StackPane.setAlignment(timelineBackground, Pos.TOP_LEFT);
         StackPane.setAlignment(eventLayer, Pos.TOP_LEFT);
 
+        // WICHTIG: TimelineStack soll seine Höhe aus timelineBackground übernehmen (sonst kann unten abgeschnitten werden)
+        timelineStack.minHeightProperty().bind(timelineBackground.prefHeightProperty());
+        timelineStack.prefHeightProperty().bind(timelineBackground.prefHeightProperty());
+        timelineStack.setMaxHeight(Region.USE_PREF_SIZE);
+
         HBox content = new HBox(12, timeColumn, timelineStack);
         content.setAlignment(Pos.TOP_LEFT);
-        VBox.setVgrow(content, Priority.ALWAYS);
         HBox.setHgrow(timelineStack, Priority.ALWAYS);
 
         timelineBackground.prefWidthProperty().bind(timelineStack.widthProperty());
         eventLayer.prefWidthProperty().bind(timelineStack.widthProperty());
 
-        getChildren().addAll(headerBar, content);
+        // --- ScrollPane, damit auch sehr späte Termine sichtbar bleiben ---
+        ScrollPane scroll = new ScrollPane(content);
+
+        // WICHTIG: fitToHeight = false, sonst wird der Content auf Viewport-Höhe "zusammengequetscht"
+        // und die unteren Bereiche können visuell abgeschnitten werden.
+        scroll.setFitToWidth(true);
+        scroll.setFitToHeight(false);
+
+        scroll.setPannable(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+
+        // Optisch: transparent, damit es wie vorher aussieht
+        scroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        content.setStyle("-fx-background-color: transparent;");
+
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+
+        getChildren().addAll(headerBar, scroll);
         setAlignment(Pos.TOP_LEFT);
     }
 
@@ -115,7 +147,13 @@ public class DayView extends VBox {
             Label timeLabel = new Label(String.format("%02d:00", h));
             timeLabel.setStyle("-fx-text-fill: #CFCFCF; -fx-font-size: 11px;");
             timeLabel.setPrefWidth(60);
-            timeLabel.setMinHeight(60 * minuteHeight);
+
+            // Fixe Höhe, damit VBox nichts "zusammenquetscht"
+            double rowHeight = 60 * minuteHeight;
+            timeLabel.setMinHeight(rowHeight);
+            timeLabel.setPrefHeight(rowHeight);
+            timeLabel.setMaxHeight(rowHeight);
+
             timeLabel.setAlignment(Pos.TOP_RIGHT);
             timeColumn.getChildren().add(timeLabel);
         }
@@ -140,12 +178,16 @@ public class DayView extends VBox {
     private void rebuildTimeline(int sHour, int eHour) {
         this.startHour = sHour;
         this.endHour = eHour;
+
         double totalMinutes = (endHour - startHour) * 60.0;
         double totalHeight = totalMinutes * minuteHeight;
 
-        timeColumn.setPrefHeight(totalHeight);
-        timelineBackground.setPrefHeight(totalHeight);
-        eventLayer.setPrefHeight(totalHeight);
+        // timeColumn + timelineBackground haben oben+unten Padding, eventLayer ist nach unten verschoben
+        double extra = TOP_BOTTOM_OFFSET * 2;
+
+        timeColumn.setPrefHeight(totalHeight + extra);
+        timelineBackground.setPrefHeight(totalHeight + extra);
+        eventLayer.setPrefHeight(totalHeight + extra);
 
         buildTimeColumn();
         buildBackgroundRows();
@@ -214,8 +256,18 @@ public class DayView extends VBox {
             block.setPadding(new Insets(6));
             block.setMinHeight(blockHeight);
             block.setPrefHeight(blockHeight);
+
+            // neue Logik: benutze Kategorie-Farbe falls vorhanden, sonst Default
+            String baseColor = "#3A6DFF"; // Standard-Farbe
+            try {
+                if (t.getKategorie() != null && t.getKategorie().getFarbe() != null && !t.getKategorie().getFarbe().isBlank()) {
+                    baseColor = t.getKategorie().getFarbe().trim();
+                }
+            } catch (Throwable ignore) {}
+
+            String darker = darkenHex(baseColor, 0.85); // leicht dunkler für Gradient
             block.setStyle(
-                    "-fx-background-color: linear-gradient(#3A6DFF, #2A56D6); " +
+                    "-fx-background-color: linear-gradient(" + baseColor + ", " + darker + "); " +
                             "-fx-background-radius: 8; " +
                             "-fx-border-radius: 8; " +
                             "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 8, 0.2, 0, 2);"
@@ -231,9 +283,8 @@ public class DayView extends VBox {
                     clippedEnd.getHour(), clippedEnd.getMinute()
             );
 
-            // Ersetze: Label titleLabel = new Label(t.getTitel());
             String displayTitle = t.getTitel() == null ? "" : t.getTitel();
-            if (MainLogik.isShowAllFamilyTermine()) {
+            if (MainLogik.getZeigeAlleTermine()) {
                 String owner = findOwnerNameForTermin(t);
                 if (owner != null && !owner.isBlank()) {
                     displayTitle = owner + ": " + displayTitle;
@@ -266,66 +317,60 @@ public class DayView extends VBox {
                 block.setCursor(Cursor.DEFAULT);
             });
 
-            // --- NEU: ContextMenu mit "Löschen" (ohne Bestätigungsdialog, dezenter Hover, kein blaues Focus) ---
+            // --- ContextMenu mit "Löschen" (ohne Bestätigungsdialog, dezenter Hover, kein blaues Focus) ---
             ContextMenu cm = new ContextMenu();
-            // dunkles Menü passend zum Theme
             cm.setStyle(
                     "-fx-background-color: #2a2a2d; " +
-                    "-fx-border-color: rgba(255,255,255,0.04); " +
-                    "-fx-background-radius: 8; " +
-                    "-fx-padding: 6;"
+                            "-fx-border-color: rgba(255,255,255,0.04); " +
+                            "-fx-background-radius: 8; " +
+                            "-fx-padding: 6;"
             );
 
-            // Verwenden eines Buttons innerhalb eines CustomMenuItem ermöglicht kontrolliertes Styling
             Button menuBtn = new Button("Löschen");
             Label bin = new Label("\uD83D\uDDD1");
             bin.setStyle("-fx-text-fill: #FF6B6B; -fx-font-size: 14px;");
             menuBtn.setGraphic(bin);
-            // Basis-Style: transparent, helle Schrift, kein Fokus-Farbwechsel
+
             menuBtn.setStyle(
                     "-fx-background-color: transparent; " +
-                    "-fx-text-fill: #E6E6E6; " +
-                    "-fx-font-size: 13px; " +
-                    "-fx-padding: 6 10 6 10; " +
-                    "-fx-alignment: center-left; " +
-                    "-fx-focus-color: transparent; " +
-                    "-fx-faint-focus-color: transparent;"
+                            "-fx-text-fill: #E6E6E6; " +
+                            "-fx-font-size: 13px; " +
+                            "-fx-padding: 6 10 6 10; " +
+                            "-fx-alignment: center-left; " +
+                            "-fx-focus-color: transparent; " +
+                            "-fx-faint-focus-color: transparent;"
             );
-            // Verhindern, dass der Button beim Fokus blau wird / Fokus erhält visuelles Feedback
             menuBtn.setFocusTraversable(false);
 
-            // Dezenter Hover-Effekt ohne native blau (nur leichte Helligkeitsänderung)
             menuBtn.setOnMouseEntered(ev -> {
                 menuBtn.setStyle(
                         "-fx-background-color: rgba(255,255,255,0.03); " +
-                        "-fx-text-fill: #E6E6E6; " +
-                        "-fx-font-size: 13px; " +
-                        "-fx-padding: 6 10 6 10; " +
-                        "-fx-alignment: center-left; " +
-                        "-fx-focus-color: transparent; " +
-                        "-fx-faint-focus-color: transparent;"
+                                "-fx-text-fill: #E6E6E6; " +
+                                "-fx-font-size: 13px; " +
+                                "-fx-padding: 6 10 6 10; " +
+                                "-fx-alignment: center-left; " +
+                                "-fx-focus-color: transparent; " +
+                                "-fx-faint-focus-color: transparent;"
                 );
                 menuBtn.setCursor(Cursor.HAND);
             });
             menuBtn.setOnMouseExited(ev -> {
                 menuBtn.setStyle(
                         "-fx-background-color: transparent; " +
-                        "-fx-text-fill: #E6E6E6; " +
-                        "-fx-font-size: 13px; " +
-                        "-fx-padding: 6 10 6 10; " +
-                        "-fx-alignment: center-left; " +
-                        "-fx-focus-color: transparent; " +
-                        "-fx-faint-focus-color: transparent;"
+                                "-fx-text-fill: #E6E6E6; " +
+                                "-fx-font-size: 13px; " +
+                                "-fx-padding: 6 10 6 10; " +
+                                "-fx-alignment: center-left; " +
+                                "-fx-focus-color: transparent; " +
+                                "-fx-faint-focus-color: transparent;"
                 );
                 menuBtn.setCursor(Cursor.DEFAULT);
             });
 
             menuBtn.setOnAction(evt -> {
-                // Direkt löschen ohne Bestätigung
                 boolean ok = MainLogik.deleteTermin(t);
                 if (ok) {
-                    // Termine neu laden und DayView neu anzeigen
-                    List<Termin> newList = MainLogik.getTermineForDate(this.currentDate);
+                    List<Termin> newList = MainLogik.getTermineFuerDatum(this.currentDate);
                     this.show(this.currentDate, newList);
                 } else {
                     Alert err = new Alert(Alert.AlertType.ERROR, "Termin konnte nicht gelöscht werden.");
@@ -339,27 +384,23 @@ public class DayView extends VBox {
             cmi.setHideOnClick(true);
             cm.getItems().add(cmi);
 
-            // ContextMenu auf Request anzeigen (Rechtsklick)
             block.setOnContextMenuRequested(cmEvent -> {
                 cm.show(block, cmEvent.getScreenX(), cmEvent.getScreenY());
                 cmEvent.consume();
             });
 
-            // Alternativ: auch bei sekundärem Mausklick anzeigen (falls gewünscht)
             block.setOnMouseClicked(ev -> {
                 if (ev.getButton() == MouseButton.SECONDARY) {
                     cm.show(block, ev.getScreenX(), ev.getScreenY());
                     ev.consume();
                     return;
                 }
-                // bestehende LMB-Click-Handler (Edit öffnen)
                 if (getScene() == null || getScene().getWindow() == null) return;
                 Stage owner = (Stage) getScene().getWindow();
                 java.util.function.Consumer<Termin> onSaved = (Termin ignored) -> {
-                    List<Termin> newList = MainLogik.getTermineForDate(this.currentDate);
+                    List<Termin> newList = MainLogik.getTermineFuerDatum(this.currentDate);
                     this.show(this.currentDate, newList);
                 };
-                // Öffnet Edit-Dialog
                 TerminAdd.show(owner, this.currentDate, t, onSaved);
             });
 
@@ -371,7 +412,6 @@ public class DayView extends VBox {
         this.onRequestBack = r;
     }
 
-    // Helfer: findet den Benutzernamen, dem dieser Termin gehört (oder null)
     private String findOwnerNameForTermin(Termin t) {
         try {
             var fam = Demos.getDemoFamilie();
@@ -382,5 +422,24 @@ public class DayView extends VBox {
             }
         } catch (Throwable ignore) {}
         return null;
+    }
+
+    // Helfer: dunkelt einen #RRGGBB-String ab; bei Fehlern gibt original zurück.
+    private String darkenHex(String hex, double factor) {
+        if (hex == null) return "#000000";
+        String h = hex.trim();
+        if (h.startsWith("#")) h = h.substring(1);
+        if (h.length() != 6) return hex;
+        try {
+            int r = Integer.parseInt(h.substring(0,2), 16);
+            int g = Integer.parseInt(h.substring(2,4), 16);
+            int b = Integer.parseInt(h.substring(4,6), 16);
+            r = (int) Math.max(0, Math.min(255, Math.round(r * factor)));
+            g = (int) Math.max(0, Math.min(255, Math.round(g * factor)));
+            b = (int) Math.max(0, Math.min(255, Math.round(b * factor)));
+            return String.format("#%02X%02X%02X", r, g, b);
+        } catch (Exception ex) {
+            return hex;
+        }
     }
 }
