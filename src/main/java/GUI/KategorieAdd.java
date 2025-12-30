@@ -1,4 +1,3 @@
-// java
 package GUI;
 
 import JavaLogik.MainLogik;
