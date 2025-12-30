@@ -1,4 +1,3 @@
-// java
 package GUI;
 
 import JavaLogik.Termin;
@@ -18,7 +17,6 @@ import javafx.scene.text.Font;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
-
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -26,7 +24,6 @@ import java.util.function.Consumer;
 
 public class TerminAdd extends Stage {
 
-    // --- Felder für das Formular ---
     private TextField titelField;
     private DatePicker startDate;
     private TextField startTime;
@@ -35,60 +32,44 @@ public class TerminAdd extends Stage {
     private TextArea beschreibung;
     private ComboBox<String> kategorieCb;
     private Label errorLbl;
-
-    // --- Logik-Felder ---
     private final Consumer<Termin> onSaved;
-    private final Runnable onKategorieChanged; // NEU: wird aufgerufen wenn im Dialog eine Kategorie erstellt wurde
+    private final Runnable onKategorieChanged;
     private final Termin existingTermin;
     private final boolean editMode;
-
-    // Formatter für die Zeit-Eingabe
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
-    // --- Konstruktor für "Neuen Termin anlegen" (alt, kompatibel) ---
-    public TerminAdd(Stage owner, LocalDate defaultDate, Consumer<Termin> onSaved) {
-        this(owner, defaultDate, onSaved, null);
-    }
-
-    // --- Konstruktor für "Neuen Termin anlegen" (neu mit Callback) ---
+    // neuer Termin
     public TerminAdd(Stage owner, LocalDate defaultDate, Consumer<Termin> onSaved, Runnable onKategorieChanged) {
         this.onSaved = onSaved;
         this.onKategorieChanged = onKategorieChanged;
         this.existingTermin = null;
         this.editMode = false;
 
-        initWindow(owner);
-        initFields(defaultDate);
-        buildScene("Neuen Termin anlegen");
+        fensterInitialisieren(owner);
+        felderInitialisieren(defaultDate);
+        erstelleSzene("Neuen Termin anlegen");
     }
 
-    // --- Konstruktor für "Termin bearbeiten" (alt, kompatibel) ---
-    public TerminAdd(Stage owner, LocalDate defaultDate, Termin existing, Consumer<Termin> onSaved) {
-        this(owner, defaultDate, existing, onSaved, null);
-    }
-
-    // --- Konstruktor für "Termin bearbeiten" (neu mit Callback) ---
+    // Termin bearbeiten
     public TerminAdd(Stage owner, LocalDate defaultDate, Termin existing, Consumer<Termin> onSaved, Runnable onKategorieChanged) {
         this.onSaved = onSaved;
         this.onKategorieChanged = onKategorieChanged;
         this.existingTermin = existing;
         this.editMode = (existing != null);
 
-        initWindow(owner);
-        initFields(defaultDate);
-        fillFieldsFromExisting();
-        buildScene("Termin bearbeiten");
+        fensterInitialisieren(owner);
+        felderInitialisieren(defaultDate);
+        felderFuellen();
+        erstelleSzene("Termin bearbeiten");
     }
 
-    // --- Fenster-Grundeinstellungen ---
-    private void initWindow(Stage owner) {
+    private void fensterInitialisieren(Stage owner) {
         initOwner(owner);
         initModality(Modality.WINDOW_MODAL);
         initStyle(StageStyle.TRANSPARENT);
     }
 
-    // --- Formular-Felder anlegen und Kategorien laden ---
-    private void initFields(LocalDate defaultDate) {
+    private void felderInitialisieren(LocalDate defaultDate) {
         LocalDate initialDate = (defaultDate != null) ? defaultDate : LocalDate.now();
 
         titelField = new TextField();
@@ -109,6 +90,8 @@ public class TerminAdd extends Stage {
 
         kategorieCb = new ComboBox<>();
         kategorieCb.setPromptText("Kategorie (optional)");
+
+        // Kategorienamen laden
         try {
             java.util.List<String> katNamen = MainLogik.getKategorienNamen();
             if (katNamen != null && !katNamen.isEmpty()) {
@@ -118,90 +101,95 @@ public class TerminAdd extends Stage {
             System.out.println("Kategorien konnten nicht geladen werden: " + ex.getMessage());
         }
 
+        // Fehleranzeige
         errorLbl = new Label();
         errorLbl.setStyle("-fx-text-fill: #FF8888; -fx-font-size: 12px;");
     }
 
-    // --- Felder aus bestehendem Termin vorbefüllen (für Edit-Modus) ---
-    private void fillFieldsFromExisting() {
+    // füllt die Felder mit den Daten des bestehenden Termins
+    private void felderFuellen() {
         if (existingTermin == null) return;
 
-        try {
-            if (existingTermin.getTitel() != null) {
-                titelField.setText(existingTermin.getTitel());
+        // Titel setzen
+        titelField.setText(existingTermin.getTitel());
+
+        // Start/Ende Datum + Uhrzeit setzen
+        ZoneId zone = ZoneId.systemDefault();
+        ZonedDateTime zs = ZonedDateTime.ofInstant(existingTermin.getStart(), zone);
+        ZonedDateTime ze = ZonedDateTime.ofInstant(existingTermin.getEnde(), zone);
+
+        startDate.setValue(zs.toLocalDate());
+        startTime.setText(String.format("%02d:%02d", zs.getHour(), zs.getMinute()));
+
+        endDate.setValue(ze.toLocalDate());
+        endTime.setText(String.format("%02d:%02d", ze.getHour(), ze.getMinute()));
+
+        // Beschreibung setzen
+        if (existingTermin.getBeschreibung() != null) {
+            beschreibung.setText(existingTermin.getBeschreibung());
+        }
+
+
+        // Kategorie setzen
+        if (existingTermin.getKategorie() != null && existingTermin.getKategorie().getName() != null) {
+            String kn = existingTermin.getKategorie().getName();
+            if (!kategorieCb.getItems().contains(kn)) {
+                kategorieCb.getItems().add(kn);
             }
-        } catch (Exception ignored) {}
+            kategorieCb.setValue(kn);
+        }
 
-        try {
-            ZoneId zone = ZoneId.systemDefault();
-            ZonedDateTime zs = ZonedDateTime.ofInstant(existingTermin.getStart(), zone);
-            ZonedDateTime ze = ZonedDateTime.ofInstant(existingTermin.getEnde(), zone);
-
-            startDate.setValue(zs.toLocalDate());
-            startTime.setText(String.format("%02d:%02d", zs.getHour(), zs.getMinute()));
-
-            endDate.setValue(ze.toLocalDate());
-            endTime.setText(String.format("%02d:%02d", ze.getHour(), ze.getMinute()));
-        } catch (Exception ignored) {}
-
-        try {
-            if (existingTermin.getBeschreibung() != null) {
-                beschreibung.setText(existingTermin.getBeschreibung());
-            }
-        } catch (Exception ignored) {}
-
-        try {
-            if (existingTermin.getKategorie() != null && existingTermin.getKategorie().getName() != null) {
-                String kn = existingTermin.getKategorie().getName();
-                if (!kategorieCb.getItems().contains(kn)) {
-                    kategorieCb.getItems().add(kn);
-                }
-                kategorieCb.setValue(kn);
-            }
-        } catch (Exception ignored) {}
     }
 
-    // --- Szene / Layout bauen ---
-    private void buildScene(String windowTitle) {
+    // baut UI
+    private void erstelleSzene(String windowTitle) {
         setTitle(windowTitle);
 
+        // Fenstertitel
         Label titleLabel = new Label(windowTitle);
         titleLabel.setFont(Font.font(16));
         titleLabel.setStyle("-fx-text-fill: #F2F2F2; -fx-font-weight: 600;");
 
+        // Grid für Label + Eingabefelder
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(8);
         grid.setPadding(new Insets(8, 0, 0, 0));
 
+        // Name
         Label lblTitel = new Label("Titel:");
         lblTitel.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblTitel, 0, 0);
         grid.add(titelField, 1, 0, 2, 1);
 
+        // Start
         Label lblStart = new Label("Start Datum:");
         lblStart.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblStart, 0, 1);
         grid.add(startDate, 1, 1);
         grid.add(startTime, 2, 1);
 
+        // Ende
         Label lblEnde = new Label("Ende Datum:");
         lblEnde.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblEnde, 0, 2);
         grid.add(endDate, 1, 2);
         grid.add(endTime, 2, 2);
 
+        // Kategorie
         Label lblKat = new Label("Kategorie:");
         lblKat.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblKat, 0, 3);
 
-        // Kategorie-ComboBox + kleiner "+" Button zum Erstellen neuer Kategorien
+        // Button zum Erstellen einer neuen Kategorie
         Button addCategoryBtn = new Button("+");
         addCategoryBtn.setPrefSize(28, 28);
         addCategoryBtn.setStyle(
                 "-fx-background-color: transparent; -fx-border-color: rgba(255,255,255,0.06); " +
                         "-fx-border-radius: 6; -fx-background-radius: 6; -fx-text-fill: #E6E6E6;"
         );
+
+        // Hover auf Kategorie-Button
         addCategoryBtn.setOnMouseEntered(ev -> {
             addCategoryBtn.setCursor(Cursor.HAND);
             addCategoryBtn.setScaleX(1.06);
@@ -213,7 +201,7 @@ public class TerminAdd extends Stage {
             addCategoryBtn.setScaleY(1.0);
         });
 
-        // WICHTIG: KategorieAdd mit onChanged aufrufen -> StandardAnsicht kann refreshen
+        // fügt neue Kategorie hinzu
         addCategoryBtn.setOnAction(ev -> {
             Stage owner = (getOwner() instanceof Stage) ? (Stage) getOwner() : null;
 
@@ -227,11 +215,12 @@ public class TerminAdd extends Stage {
                             kategorieCb.setValue(newName);
                         });
                     },
-                    // NEU: “Kategorien geändert” nach außen melden (falls gesetzt)
+                    // meldet nach außen: Kategorien wurden geändert
                     this.onKategorieChanged
             );
         });
 
+        // Kategorie-Auswahl + Kategorie hinzufügen nebeneinander
         HBox katBox = new HBox(8, kategorieCb, addCategoryBtn);
         katBox.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(kategorieCb, Priority.ALWAYS);
@@ -239,21 +228,24 @@ public class TerminAdd extends Stage {
 
         grid.add(katBox, 1, 3, 2, 1);
 
+        // Beschreibung
         Label lblBesch = new Label("Beschreibung:");
         lblBesch.setStyle("-fx-text-fill: #E6E6E6; -fx-font-size: 13px;");
         grid.add(lblBesch, 0, 4);
         grid.add(beschreibung, 1, 4, 2, 1);
 
+        // Fehler
         grid.add(errorLbl, 0, 5, 3, 1);
 
+        // Buttons unten (Abbrechen + Speichern)
         Button cancelBtn = new Button("\u2716  Abbrechen");
         Button saveBtn = new Button("\u2714  Speichern");
 
         cancelBtn.setPrefWidth(120);
         saveBtn.setPrefWidth(120);
 
-        String baseBtn = "-fx-background-radius: 8; -fx-border-radius: 8; "
-                + "-fx-padding: 8 10 8 10; -fx-font-size: 13px;";
+        String baseBtn = "-fx-background-radius: 8; -fx-border-radius: 8; " +
+                "-fx-padding: 8 10 8 10; -fx-font-size: 13px;";
 
         cancelBtn.setStyle(
                 baseBtn +
@@ -267,6 +259,7 @@ public class TerminAdd extends Stage {
                         "-fx-text-fill: white;"
         );
 
+        // Hover
         applyHover(cancelBtn, "#3D3D3D", "#2A2A2A", true);
         applyHover(saveBtn, "#4B7BFF", "#3A6DFF", true);
 
@@ -277,6 +270,8 @@ public class TerminAdd extends Stage {
         root.setPadding(new Insets(14));
         root.setPrefWidth(480);
         root.setStyle("-fx-background-color: #2a2a2d; -fx-background-radius: 10;");
+
+        // Schatten
         root.setEffect(new DropShadow(
                 BlurType.GAUSSIAN,
                 Color.rgb(0, 0, 0, 0.45),
@@ -285,37 +280,31 @@ public class TerminAdd extends Stage {
 
         Scene scene = new Scene(root);
         scene.setFill(Color.TRANSPARENT);
+
+        // schließen mit ESC
         scene.setOnKeyPressed(k -> {
             if (k.getCode() == KeyCode.ESCAPE) close();
         });
 
         setScene(scene);
-
-        // Fenster in die Mitte des Owners setzen
-        if (getOwner() != null) {
-            double w = getOwner().getWidth();
-            double h = getOwner().getHeight();
-            double x = getOwner().getX();
-            double y = getOwner().getY();
-
-            setX(x + w / 2 - 240);
-            setY(y + h / 2 - 120);
-        }
+        centerOnScreen();
 
         cancelBtn.setOnAction(e -> close());
-        saveBtn.setOnAction(e -> handleSave());
+        saveBtn.setOnAction(e -> speichern());
     }
 
-    // --- Speichern-Logik (für Neu & Edit) ---
-    private void handleSave() {
+    // speichert entweder neuen Termin oder bearbeitet bestehenden
+    private void speichern() {
         errorLbl.setText("");
 
+        // Titel prüfen
         String titel = (titelField.getText() != null) ? titelField.getText().trim() : "";
         if (titel.isEmpty()) {
             errorLbl.setText("Titel ist erforderlich.");
             return;
         }
 
+        // Datum prüfen
         LocalDate sd = startDate.getValue();
         LocalDate ed = endDate.getValue();
         if (sd == null || ed == null) {
@@ -323,6 +312,7 @@ public class TerminAdd extends Stage {
             return;
         }
 
+        // Zeit prüfen
         LocalTime st;
         LocalTime et;
         try {
@@ -332,30 +322,37 @@ public class TerminAdd extends Stage {
             errorLbl.setText("Zeitformat muss HH:mm sein.");
             return;
         }
-
         ZonedDateTime zStart = ZonedDateTime.of(sd, st, ZoneId.systemDefault());
         ZonedDateTime zEnd = ZonedDateTime.of(ed, et, ZoneId.systemDefault());
 
+        // Reihenfolge prüfen
         if (!zEnd.isAfter(zStart)) {
             errorLbl.setText("Ende muss nach Start liegen.");
             return;
         }
 
+        // Speicherung in Instant
         Instant iStart = zStart.toInstant();
         Instant iEnd = zEnd.toInstant();
+
+        // Beschreibung
         String beschr = (beschreibung.getText() != null) ? beschreibung.getText() : "";
 
+        // Kategorie holen
         String selectedKatName = kategorieCb.getValue();
         Kategorie chosenKat = null;
         if (selectedKatName != null && !selectedKatName.isBlank()) {
             chosenKat = MainLogik.getKategoriePerName(selectedKatName);
         }
 
+        // Neuer Termin
         if (!editMode) {
             Termin neu = new Termin(titel, iStart, iEnd, beschr, chosenKat);
             if (onSaved != null) onSaved.accept(neu);
             close();
-        } else {
+        }
+        // Bearbeiten
+        else {
             boolean ok = MainLogik.terminBearbeiten(existingTermin, titel, iStart, iEnd, beschr, chosenKat);
             if (!ok) {
                 errorLbl.setText("Konnte Termin nicht bearbeiten. Möglicher Konflikt mit anderem Termin.");
@@ -366,31 +363,19 @@ public class TerminAdd extends Stage {
         }
     }
 
-    // --- Öffnen für "Neu" (alt kompatibel) ---
-    public static void show(Stage owner, LocalDate defaultDate, Consumer<Termin> onSaved) {
-        TerminAdd d = new TerminAdd(owner, defaultDate, onSaved, null);
-        d.showAndWait();
-    }
-
-    // --- Öffnen für "Neu" (neu) ---
+    // Öffnen
     public static void show(Stage owner, LocalDate defaultDate, Consumer<Termin> onSaved, Runnable onKategorieChanged) {
         TerminAdd d = new TerminAdd(owner, defaultDate, onSaved, onKategorieChanged);
         d.showAndWait();
     }
 
-    // --- Öffnen für "Edit" (alt kompatibel) ---
+    // Öffnen: Edit
     public static void show(Stage owner, LocalDate defaultDate, Termin existing, Consumer<Termin> onSaved) {
         TerminAdd d = new TerminAdd(owner, defaultDate, existing, onSaved, null);
         d.showAndWait();
     }
 
-    // --- Öffnen für "Edit" (neu) ---
-    public static void show(Stage owner, LocalDate defaultDate, Termin existing, Consumer<Termin> onSaved, Runnable onKategorieChanged) {
-        TerminAdd d = new TerminAdd(owner, defaultDate, existing, onSaved, onKategorieChanged);
-        d.showAndWait();
-    }
-
-    // --- Hover-Effekt-Helfer ---
+    // Hover wie sonst auch
     private void applyHover(Button b, String hoverBg, String normalBg, boolean useTranslate) {
         b.setOnMouseEntered(e -> {
             b.setCursor(Cursor.HAND);

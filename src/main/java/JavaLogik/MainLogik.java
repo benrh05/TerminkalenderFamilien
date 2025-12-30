@@ -513,7 +513,7 @@ public class MainLogik {
     }
 
     /* @Luis: Die Methode ist eigentlich unnötig, da die Rolle schon beim Anlegen des Benutzers bereinigt wird.
-    Rollen haben wir jetzt eh nicht richtig umgesetzt, also können die auch in die Datenbank geschrieben werden wie sie sind. */
+    Rollen haben wir jetzt eh nicht richtig umgesetzt, also können die auch in die datenbank geschrieben werden wie sie sind. */
     // Hilfsmethode zur Normalisierung von Rollen für DB-Insert (nur ADMIN oder KIND zulassen)
     private static String sanitizeRole(String rolle) {
         if (rolle == null) return "Kind";
@@ -521,5 +521,16 @@ public class MainLogik {
         if ("ADMIN".equals(r)) return "ADMIN";
         // nur zulässige Werte sind ADMIN oder KIND -> alles andere als KIND behandeln
         return "Kind";
+    }
+
+    // Liefert den Namen des Nutzers für einen Termin
+    public static String getBenutzernameFuerTermin(Termin t) {
+        Familie fam = Demos.getDemoFamilie();
+        for (Benutzer b : fam.getMitglieder()) {
+            if (b.getKalender().getTermine().contains(t)) {
+                return b.getName();
+            }
+        }
+        return null;
     }
 }

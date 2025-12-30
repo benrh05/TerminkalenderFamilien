@@ -20,7 +20,6 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
-
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -28,8 +27,6 @@ import java.util.List;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Set;
-
-// zusätzliche Importe für die Uhr
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.scene.control.ContextMenu;
