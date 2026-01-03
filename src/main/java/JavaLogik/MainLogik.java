@@ -1,5 +1,7 @@
 package JavaLogik;
 
+import DB.Database;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,9 +14,16 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
 import java.util.Map;
 import java.util.HashMap;
+
+// --- NEU: Calendar/TimeZone imports für Berlin-Zeitzone ---
+import java.util.Calendar;
+import java.util.TimeZone;
+
+// --- NEU: Reflection-Imports für einfache Id-Lesung ---
+import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 
 public class MainLogik {
 
@@ -30,9 +39,92 @@ public class MainLogik {
 
         // Demo-Daten initialisieren
         try {
-            persistDemosToDB();  // riesen Methode unten
+            loadFromDB(); // lade vorhandene Einträge aus der DB ins Programm
         } catch (Throwable ex) {
-            System.err.println("Warnung: Persistieren der Demos in die DB fehlgeschlagen: " + ex.getMessage());
+            System.err.println("Warnung: Persistieren/Laden der Demos in die DB fehlgeschlagen: " + ex.getMessage());
+        }
+    }
+
+    // Lädt Personen, Kategorien und Termine aus der DB und füllt die Demo-Familie.
+    private static void loadFromDB() {
+        try (Connection conn = Database.getConnection()) {
+            Familie fam = Demos.getDemoFamilie();
+            if (fam == null) {
+                Demos.demo();
+                fam = Demos.getDemoFamilie();
+                if (fam == null) return;
+            }
+
+            // leere Demo-Listen
+            fam.getMitglieder().clear();
+            fam.getKategorien().clear();
+
+            // Personen laden
+            Map<Integer, Benutzer> personMap = new HashMap<>();
+            try (PreparedStatement ps = conn.prepareStatement("SELECT id, name, passwort_hash, rolle FROM person");
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int id = rs.getInt("id");
+                    String name = rs.getString("name");
+                    String pw = rs.getString("passwort_hash");
+                    String rolle = rs.getString("rolle");
+                    Benutzer b = new Benutzer(name == null ? "" : name, "", pw == null ? "" : pw, rolle == null ? "" : rolle);
+                    fam.benutzerHinzufuegen(b);
+                    personMap.put(id, b);
+                }
+            } catch (SQLException ex) {
+                System.err.println("Personen laden fehlgeschlagen: " + ex.getMessage());
+            }
+
+            // Kategorien laden
+            Map<Integer, Kategorie> categoryMap = new HashMap<>();
+            try (PreparedStatement ps = conn.prepareStatement("SELECT id, name, farbe FROM kategorie");
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int id = rs.getInt("id");
+                    String name = rs.getString("name");
+                    String farbe = rs.getString("farbe");
+                    Kategorie k = new Kategorie(name == null ? "" : name, farbe == null ? "" : farbe);
+                    fam.kategorieHinzufuegen(k);
+                    categoryMap.put(id, k);
+                }
+            } catch (SQLException ex) {
+                System.err.println("Kategorien laden fehlgeschlagen: " + ex.getMessage());
+            }
+
+            // Termine laden
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT id, titel, beschreibung, startzeit, endzeit, kategorie_id, person_id FROM termin");
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    long id = rs.getLong("id");
+                    String titel = rs.getString("titel");
+                    String beschr = rs.getString("beschreibung");
+                    java.sql.Timestamp sTs = rs.getTimestamp("startzeit");
+                    java.sql.Timestamp eTs = rs.getTimestamp("endzeit");
+                    Instant start = (sTs == null) ? null : sTs.toInstant();
+                    Instant end = (eTs == null) ? null : eTs.toInstant();
+                    int kId = rs.getInt("kategorie_id");
+                    if (rs.wasNull()) kId = -1;
+                    int pId = rs.getInt("person_id");
+                    if (rs.wasNull()) pId = -1;
+
+                    Kategorie k = (kId > 0) ? categoryMap.get(kId) : null;
+                    Benutzer owner = (pId > 0) ? personMap.get(pId) : null;
+                    if (owner == null) continue; // ohne Besitzer überspringen
+
+                    Termin t = new Termin(titel, start, end, beschr, k);
+                    setIdIfPossible(t, id);
+                    owner.getKalender().terminHinzufuegen(t);
+                }
+            } catch (SQLException ex) {
+                System.err.println("Termine laden fehlgeschlagen: " + ex.getMessage());
+            }
+
+        } catch (SQLException ex) {
+            System.err.println("DB-Verbindung beim Laden fehlgeschlagen: " + ex.getMessage());
+        } catch (Throwable ex) {
+            System.err.println("Unerwarteter Fehler beim Laden aus DB: " + ex.getMessage());
         }
     }
 
@@ -107,7 +199,17 @@ public class MainLogik {
             String korrekteRolle = (rolle == null || rolle.isBlank()) ? "Kind" : rolle.trim();  // Standard Rolle "Kind"
             boolean geklappt =  fam.erstelleBenutzer(name, email, password, korrekteRolle);
             if (geklappt) {
-                // @Luis: hier müsste der Benutzer auch in die DB geschrieben werden
+                // DB: einfachen Insert der neuen Person
+                try (Connection conn = Database.getConnection();
+                     PreparedStatement ps = conn.prepareStatement(
+                             "INSERT INTO person (name, passwort_hash, rolle) VALUES (?, ?, ?)")) {
+                    ps.setString(1, name.trim());
+                    ps.setString(2, password == null ? "" : password);
+                    ps.setString(3, sanitizeRole(korrekteRolle));
+                    ps.executeUpdate();
+                } catch (SQLException ex) {
+                    System.err.println("Benutzer DB-Insert fehlgeschlagen: " + ex.getMessage());
+                }
             }
             return geklappt;
         } catch (Throwable ex) {
@@ -211,13 +313,15 @@ public class MainLogik {
                 }
             }
 
-            // d) Termin einfügen
+            // d) Termin einfügen - jetzt mit RETURN_GENERATED_KEYS und ID-Zuweisung
             try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO termin (titel, beschreibung, startzeit, endzeit, kategorie_id, person_id) VALUES (?, ?, ?, ?, ?, ?)")) {
+                    "INSERT INTO termin (titel, beschreibung, startzeit, endzeit, kategorie_id, person_id) VALUES (?, ?, ?, ?, ?, ?)",
+                    Statement.RETURN_GENERATED_KEYS)) {
                 ps.setString(1, t.getTitel());
                 ps.setString(2, t.getBeschreibung());
-                ps.setTimestamp(3, Timestamp.from(t.getStart()));
-                ps.setTimestamp(4, Timestamp.from(t.getEnde()));
+                // Zeit als SQL TIMESTAMP in deutscher Zeitzone speichern
+                setTimestampBerlin(ps, 3, t.getStart());
+                setTimestampBerlin(ps, 4, t.getEnde());
                 if (kategorieId != null) {
                     ps.setInt(5, kategorieId);
                 } else {
@@ -229,6 +333,14 @@ public class MainLogik {
                     ps.setNull(6, java.sql.Types.INTEGER);
                 }
                 ps.executeUpdate();
+
+                // generierte ID lesen und dem Termin-Objekt zuweisen
+                try (ResultSet keys = ps.getGeneratedKeys()) {
+                    if (keys.next()) {
+                        long genId = keys.getLong(1);
+                        setIdIfPossible(t, genId);
+                    }
+                }
             }
 
             conn.commit();
@@ -246,10 +358,72 @@ public class MainLogik {
     // Bearbeiten eines Termins
     public static boolean terminBearbeiten(Termin original, String neuerTitel, Instant neuerStart, Instant neuesEnde, String neueBeschreibung, Kategorie neueKategorie) {
         try {
+            if (original == null) return false;
+
+            // ID muss vorhanden sein
+            Long tid = getIdFromTermin(original);
+            if (tid == null || tid <= 0) {
+                System.err.println("terminBearbeiten: keine Termin-ID");
+                return false;
+            }
+
             Benutzer b = getBenutzerPerName(currentUserName);
-            return b.getKalender().terminBearbeiten(original, neuerTitel, neuerStart, neuesEnde, neueBeschreibung, neueKategorie);
-            // @Luis hier müsste ein DB-Update-Aufruf hin.
+            if (b == null) return false;
+
+            // lokal ändern
+            boolean localOk = b.getKalender().terminBearbeiten(original, neuerTitel, neuerStart, neuesEnde, neueBeschreibung, neueKategorie);
+            if (!localOk) return false;
+
+            // DB-Update per id
+            try (Connection conn = Database.getConnection()) {
+                conn.setAutoCommit(false);
+
+                Integer kategorieId = null;
+                if (neueKategorie != null && neueKategorie.getName() != null && !neueKategorie.getName().isBlank()) {
+                    String kname = neueKategorie.getName();
+                    try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM kategorie WHERE name = ?")) {
+                        ps.setString(1, kname);
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (rs.next()) kategorieId = rs.getInt(1);
+                        }
+                    }
+                    if (kategorieId == null) {
+                        try (PreparedStatement ps = conn.prepareStatement("INSERT INTO kategorie (name, farbe) VALUES (?, ?)", Statement.RETURN_GENERATED_KEYS)) {
+                            ps.setString(1, kname);
+                            ps.setString(2, neueKategorie.getFarbe() == null ? "" : neueKategorie.getFarbe());
+                            ps.executeUpdate();
+                            try (ResultSet keys = ps.getGeneratedKeys()) { if (keys.next()) kategorieId = keys.getInt(1); }
+                        }
+                    }
+                }
+
+                try (PreparedStatement ups = conn.prepareStatement(
+                        "UPDATE termin SET titel = ?, beschreibung = ?, startzeit = ?, endzeit = ?, kategorie_id = ? WHERE id = ?")) {
+                    ups.setString(1, neuerTitel);
+                    ups.setString(2, neueBeschreibung == null ? "" : neueBeschreibung);
+                    // Zeiten als SQL TIMESTAMP in deutscher Zeitzone speichern
+                    setTimestampBerlin(ups, 3, neuerStart);
+                    setTimestampBerlin(ups, 4, neuesEnde);
+                    if (kategorieId != null) ups.setInt(5, kategorieId);
+                    else ups.setNull(5, java.sql.Types.INTEGER);
+                    ups.setLong(6, tid);
+                    int updated = ups.executeUpdate();
+                    if (updated == 0) {
+                        conn.rollback();
+                        System.err.println("DB-Update traf keinen Datensatz für id=" + tid);
+                        return false;
+                    }
+                }
+
+                conn.commit();
+            } catch (SQLException ex) {
+                System.err.println("DB-Update fehlgeschlagen: " + ex.getMessage());
+                return false;
+            }
+
+            return true;
         } catch (Throwable ex) {
+            System.err.println("terminBearbeiten fehlgeschlagen: " + ex.getMessage());
             return false;
         }
     }
@@ -259,7 +433,14 @@ public class MainLogik {
         try {
             Benutzer b = getBenutzerPerName(currentUserName);
             b.getKalender().terminLoeschen(t);
-            // @Luis hier müsste ein DB-Delete-Aufruf hin.
+
+            // DB-Löschung nach lokalem Entfernen (einfach): bevorzugt per Termin-ID, sonst Fallback
+            try {
+                deleteTerminFromDB(currentUserName, t);
+            } catch (Throwable ex) {
+                System.err.println("DB-Löschung fehlgeschlagen: " + ex.getMessage());
+            }
+
             return true;
         } catch (Throwable ex) {
             System.err.println("Löschen fehlgeschlagen: " + ex.getMessage());
@@ -286,7 +467,21 @@ public class MainLogik {
         try {
             Familie fam = Demos.getDemoFamilie();
             if (fam == null) return false;
-            return fam.erstelleKategorie(name.trim(), farbe == null ? "#4A90E2" : farbe.trim());
+            boolean result = fam.erstelleKategorie(name.trim(), farbe == null ? "#4A90E2" : farbe.trim());
+            if (!result) return false;
+
+            // DB: einfache Speicherung (versucht, Kategorie in DB anzulegen)
+            try (Connection conn = Database.getConnection();
+                 PreparedStatement ps = conn.prepareStatement("INSERT INTO kategorie (name, farbe) VALUES (?, ?)")) {
+                ps.setString(1, name.trim());
+                ps.setString(2, farbe == null ? "" : farbe.trim());
+                ps.executeUpdate();
+            } catch (SQLException ex) {
+                // kurz loggen, lokale Erstellung bleibt
+                System.err.println("Kategorie DB-Insert fehlgeschlagen: " + ex.getMessage());
+            }
+
+            return true;
         } catch (Throwable ex) {
             System.err.println("Kategorie erstellen fehlgeschlagen: " + ex.getMessage());
             return false;
@@ -475,8 +670,9 @@ public class MainLogik {
                                             "INSERT INTO termin (titel, beschreibung, startzeit, endzeit, kategorie_id, person_id) VALUES (?, ?, ?, ?, ?, ?)")) {
                                         ps.setString(1, t.getTitel());
                                         ps.setString(2, t.getBeschreibung());
-                                        ps.setTimestamp(3, Timestamp.from(t.getStart()));
-                                        ps.setTimestamp(4, Timestamp.from(t.getEnde()));
+                                        // Zeiten als SQL TIMESTAMP in deutscher Zeitzone
+                                        setTimestampBerlin(ps, 3, t.getStart());
+                                        setTimestampBerlin(ps, 4, t.getEnde());
                                         if (kId != null) {
                                             ps.setInt(5, kId);
                                         } else {
@@ -532,5 +728,127 @@ public class MainLogik {
             }
         }
         return null;
+    }
+
+    // Löscht einen Termin in der DB: zuerst per id (falls vorhanden), sonst per person+start+end+(titel)
+    public static void deleteTerminFromDB(String personName, Termin t) {
+        if (personName == null || t == null) return;
+        try (Connection conn = Database.getConnection()) {
+            conn.setAutoCommit(false);
+
+            // 1) versuche per Termin-ID
+            Long tid = getIdFromTermin(t);
+            if (tid != null && tid > 0) {
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM termin WHERE id = ?")) {
+                    ps.setLong(1, tid);
+                    ps.executeUpdate();
+                    conn.commit();
+                    return;
+                } catch (SQLException ex) {
+                    System.err.println("Löschen per ID fehlgeschlagen, versuche Fallback: " + ex.getMessage());
+                }
+            }
+
+            // 2) Fallback: person_id + startzeit + endzeit + titel
+            Integer personId = null;
+            try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM person WHERE name = ?")) {
+                ps.setString(1, personName);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) personId = rs.getInt(1);
+                }
+            }
+
+            if (personId != null) {
+                String deleteSql = "DELETE FROM termin WHERE person_id = ? AND startzeit = ? AND endzeit = ? AND titel = ?";
+                int deleted = 0;
+                try (PreparedStatement ds = conn.prepareStatement(deleteSql)) {
+                    ds.setInt(1, personId);
+                    // Zeiten als SQL TIMESTAMP in deutscher Zeitzone vergleichen
+                    setTimestampBerlin(ds, 2, t.getStart());
+                    setTimestampBerlin(ds, 3, t.getEnde());
+                    ds.setString(4, t.getTitel() == null ? "" : t.getTitel());
+                    deleted = ds.executeUpdate();
+                }
+
+                if (deleted == 0) {
+                    // noch weniger restriktiv: ohne Titel
+                    try (PreparedStatement ds2 = conn.prepareStatement("DELETE FROM termin WHERE person_id = ? AND startzeit = ? AND endzeit = ?")) {
+                        ds2.setInt(1, personId);
+                        setTimestampBerlin(ds2, 2, t.getStart());
+                        setTimestampBerlin(ds2, 3, t.getEnde());
+                        ds2.executeUpdate();
+                    }
+                }
+            }
+
+            conn.commit();
+        } catch (SQLException ex) {
+            System.err.println("DB-Delete fehlgeschlagen (deleteTerminFromDB): " + ex.getMessage());
+        } catch (Throwable ex) {
+            System.err.println("Unerwarteter Fehler beim DB-Delete (deleteTerminFromDB): " + ex.getMessage());
+        }
+    }
+
+    // Versuch, eine numerische ID aus dem Termin-Objekt zu lesen (getId(), getDbId(), Feld 'id')
+    private static Long getIdFromTermin(Termin t) {
+        if (t == null) return null;
+        try {
+            try {
+                Method m = t.getClass().getMethod("getId");
+                Object val = m.invoke(t);
+                if (val instanceof Number) return ((Number) val).longValue();
+            } catch (NoSuchMethodException ignore) {}
+            try {
+                Method m = t.getClass().getMethod("getDbId");
+                Object val = m.invoke(t);
+                if (val instanceof Number) return ((Number) val).longValue();
+            } catch (NoSuchMethodException ignore) {}
+            try {
+                Field f = t.getClass().getDeclaredField("id");
+                f.setAccessible(true);
+                Object val = f.get(t);
+                if (val instanceof Number) return ((Number) val).longValue();
+            } catch (NoSuchFieldException ignore) {}
+        } catch (Throwable ex) {
+            System.err.println("getIdFromTermin error: " + ex.getMessage());
+        }
+        return null;
+    }
+
+    // Setzt die ID im Termin-Objekt, wenn möglich (kurz)
+    private static void setIdIfPossible(Termin t, long id) {
+        if (t == null) return;
+        try {
+            try {
+                Method m = t.getClass().getMethod("setId", long.class);
+                m.invoke(t, id);
+                return;
+            } catch (NoSuchMethodException ignore) {}
+            try {
+                Method m = t.getClass().getMethod("setId", Long.class);
+                m.invoke(t, Long.valueOf(id));
+                return;
+            } catch (NoSuchMethodException ignore) {}
+            try {
+                Field f = t.getClass().getDeclaredField("id");
+                f.setAccessible(true);
+                Class<?> ft = f.getType();
+                if (ft == long.class || ft == Long.class) f.set(t, id);
+                else if (ft == int.class || ft == Integer.class) f.set(t, (int) id);
+            } catch (NoSuchFieldException ignore) {}
+        } catch (Throwable ex) {
+            System.err.println("setIdIfPossible error: " + ex.getMessage());
+        }
+    }
+
+    // Helper: speichere Instant als SQL TIMESTAMP in Europe/Berlin
+    private static void setTimestampBerlin(PreparedStatement ps, int index, Instant instant) throws SQLException {
+        if (instant == null) {
+            ps.setNull(index, java.sql.Types.TIMESTAMP);
+            return;
+        }
+        java.sql.Timestamp ts = java.sql.Timestamp.from(instant);
+        Calendar berlin = Calendar.getInstance(TimeZone.getTimeZone("Europe/Berlin"));
+        ps.setTimestamp(index, ts, berlin);
     }
 }

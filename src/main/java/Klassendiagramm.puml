@@ -1,6 +1,14 @@
 
 @startuml
-' Packages
+
+   class Database {
+  - static URL : String
+  - static USER : String
+  - static PASSWORD : String
+  + static getConnection() : Connection throws SQLException
+  + static main(args : String[]) : void
+}
+
 package JavaLogik {
   class Benutzer {
     - int id
@@ -191,4 +199,5 @@ GUI.TerminAdd --> JavaLogik.MainLogik
 GUI.TerminAdd --> GUI.StandardAnsicht
 GUI.BenutzerAdd --> GUI.StandardAnsicht
 GUI.KategorieAdd --> GUI.TerminAdd
+ Database <-- JavaLogik.MainLogik
 @enduml

@@ -1,0 +1,173 @@
+ Datenbank einrichten
+
+ 1. MySQL starten
+ 2. Neue Datenbank anlegen
+ 3. Folgenden SQL-Befehl ausführen:
+
+ -- 1. TABELLE PERSON
+ CREATE TABLE person (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     name VARCHAR(100) NOT NULL UNIQUE,
+     passwort_hash VARCHAR(255) NOT NULL,
+     rolle ENUM('ADMIN', 'KIND') NOT NULL
+ );
+
+ -- 2. TABELLE KATEGORIE
+ CREATE TABLE kategorie (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     name VARCHAR(100) NOT NULL UNIQUE,
+     farbe VARCHAR(10)        -- optional: z. B. '#FF0000' oder 'ROT'
+ );
+
+ -- 3. TABELLE TERMIN
+ CREATE TABLE termin (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     titel VARCHAR(200) NOT NULL,
+     beschreibung TEXT,
+     startzeit DATETIME NOT NULL,
+     endzeit DATETIME NOT NULL,
+     kategorie_id INT,
+     person_id INT NOT NULL,
+
+     -- Verknüpfungen
+     FOREIGN KEY (kategorie_id) REFERENCES kategorie(id)
+         ON DELETE SET NULL,
+     FOREIGN KEY (person_id) REFERENCES person(id)
+         ON DELETE CASCADE
+ );
+
+
+ Um die Demo - Termine, -Personen & -Kategorien in die Datenbank einzufügen, führen Sie bitte den SQL-Befehl aus:
+
+ START TRANSACTION;
+ -- 1) Demo-Personen
+
+ INSERT IGNORE INTO person (name, passwort_hash, rolle) VALUES
+ ('Max Mustermann',  SHA2('pass', 256), 'ADMIN'),
+ ('Anna Müller',     SHA2('pass', 256), 'ADMIN'),
+ ('Chris Beispiel',  SHA2('pass', 256), 'KIND');
+
+ -- 2) Demo-Kategorien
+
+ INSERT IGNORE INTO kategorie (name, farbe) VALUES
+ ('Privat', '#A85454'),
+ ('Arbeit', '#6C8FA3'),
+ ('Uni',    '#6EBE67');
+
+
+ -- 3) Demo-Termine
+
+ -- Termine für Max Mustermann
+ INSERT INTO termin (titel, startzeit, endzeit, beschreibung, kategorie_id, person_id)
+ VALUES
+ (
+   'Zahnarzt',
+   TIMESTAMP(CURDATE(), '09:00:00'),
+   TIMESTAMP(CURDATE(), '10:30:00'),
+   'Kontrolle und Reinigung',
+   (SELECT id FROM kategorie WHERE name='Privat'),
+   (SELECT id FROM person WHERE name='Max Mustermann')
+ ),
+ (
+   'Team-Meeting',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 2 DAY), '14:00:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 2 DAY), '15:00:00'),
+   'Sprint Planung, Raum A2',
+   (SELECT id FROM kategorie WHERE name='Arbeit'),
+   (SELECT id FROM person WHERE name='Max Mustermann')
+ ),
+ (
+   'Vorlesung: Software-Architektur',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 4 DAY), '11:00:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 4 DAY), '12:30:00'),
+   'Vorlesungssaal 3',
+   (SELECT id FROM kategorie WHERE name='Uni'),
+   (SELECT id FROM person WHERE name='Max Mustermann')
+ ),
+ (
+   'Geburtstag (Party)',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 7 DAY), '18:00:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 7 DAY), '20:00:00'),
+   'Feier bei Freunden',
+   NULL,
+   (SELECT id FROM person WHERE name='Max Mustermann')
+ );
+
+ -- Termine für Anna Müller (Basis: heute + 3 Tage)
+ INSERT INTO termin (titel, startzeit, endzeit, beschreibung, kategorie_id, person_id)
+ VALUES
+ (
+   'Vorlesung: Mathe',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 3 DAY), '09:00:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 3 DAY), '10:00:00'),
+   'Hörsaal B',
+   (SELECT id FROM kategorie WHERE name='Uni'),
+   (SELECT id FROM person WHERE name='Anna Müller')
+ ),
+ (
+   'Arzttermin',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 3 DAY), '11:00:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 3 DAY), '12:00:00'),
+   'Routineuntersuchung',
+   (SELECT id FROM kategorie WHERE name='Privat'),
+   (SELECT id FROM person WHERE name='Anna Müller')
+ ),
+ (
+   'Projekt-Meeting',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '14:00:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '15:30:00'),
+   'Online-Call',
+   (SELECT id FROM kategorie WHERE name='Arbeit'),
+   (SELECT id FROM person WHERE name='Anna Müller')
+ ),
+ (
+   'Morgensport',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 7 DAY), '08:30:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 7 DAY), '09:30:00'),
+   'Joggen im Park',
+   NULL,
+   (SELECT id FROM person WHERE name='Anna Müller')
+ ),
+ (
+   'Study Group',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 8 DAY), '16:00:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 8 DAY), '17:00:00'),
+   'Gruppenraum 2',
+   (SELECT id FROM kategorie WHERE name='Uni'),
+   (SELECT id FROM person WHERE name='Anna Müller')
+ );
+
+ -- Termine für Chris Beispiel
+ INSERT INTO termin (titel, startzeit, endzeit, beschreibung, kategorie_id, person_id)
+ VALUES
+ (
+   'Zahnarzt (Chris)',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 1 DAY), '11:00:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 1 DAY), '12:00:00'),
+   'Kurztermin',
+   (SELECT id FROM kategorie WHERE name='Privat'),
+   (SELECT id FROM person WHERE name='Chris Beispiel')
+ ),
+ (
+   'Bewerbungsgespräch',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '15:00:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '16:00:00'),
+   'Vorstellungsgespräch',
+   (SELECT id FROM kategorie WHERE name='Arbeit'),
+   (SELECT id FROM person WHERE name='Chris Beispiel')
+ ),
+ (
+   'Tutorium: Algorithmen',
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 9 DAY), '10:00:00'),
+   TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 9 DAY), '11:30:00'),
+   'Sitzung im Raum 5',
+   (SELECT id FROM kategorie WHERE name='Uni'),
+   (SELECT id FROM person WHERE name='Chris Beispiel')
+ );
+
+ COMMIT;
+
+
+
+ Klassendiagramm:
+   -Falls das Klassemdiagramm nicht zu lesen ist, finden sie den Code für platUML auch in der Klassendiagramm-Datei
