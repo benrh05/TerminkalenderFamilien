@@ -77,7 +77,7 @@
    (SELECT id FROM person WHERE name='Max Mustermann')
  ),
  (
-   'Vorlesung: Software-Architektur',
+   'Vorlesung: Software-Development',
    TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 4 DAY), '11:00:00'),
    TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 4 DAY), '12:30:00'),
    'Vorlesungssaal 3',
@@ -167,7 +167,15 @@
 
  COMMIT;
 
+-- Ende der Demo-Daten
 
+Die Klassen waren ursprünglich in Packages organisiert, diese wurden jedoch bei der  Abgabe entfernt, da Ilias das nicht zugelassen hat.
 
- Klassendiagramm:
-   -Falls das Klassemdiagramm nicht zu lesen ist, finden sie den Code für platUML auch in der Klassendiagramm-Datei
+Starten Sie das Programm über die Standardansicht.
+
+Vielleicht ein wenig versteckte Funktionen:
+Rechtsklick auf einen Termin in der DayView öffnet Löschfunktion.
+Linksklick auf einen Termin in der DayView öffnet Bearbeitungsfunktion.
+Oben rechts der Ich Button, toggled zwischen Terminen aller Personen anzeigen und nur denen der angemeldeten Person.
+30min bevor ein Termin startet erscheint eine Benachrichtigung.
+Viel Spaß!

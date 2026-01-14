@@ -34,9 +34,6 @@ public class MainLogik {
     private static String currentUserName = Demos.getDemoFamilie().getBenutzerNamen().get(0); // vllt noch beim programmstart abfrage
 
     static {
-
-        // @Luis was auch immer persisitieren ist
-
         // Demo-Daten initialisieren
         try {
             loadFromDB(); // lade vorhandene Einträge aus der DB ins Programm
@@ -162,7 +159,6 @@ public class MainLogik {
     // Liefert die Termine für ein bestimmtes Datum (entweder alle Nutzer oder nur eines Nutzers)
     public static List<Termin> getTermineFuerDatum(LocalDate date) {
         try {
-            // Wenn Flag gesetzt: aggregiere Termine aller Benutzer in der Demo-Familie
             if (zeigeAlleTermine) {
                 List<Termin> all = new ArrayList<>();
                 Familie fam = Demos.getDemoFamilie();
@@ -258,7 +254,6 @@ public class MainLogik {
         Benutzer b = getBenutzerPerName(currentUserName);
         b.getKalender().terminHinzufuegen(t);
 
-        // @Luis b+c+d sieht für mich nach unnötig viel aus. vllt ausnahmen löschen - es soll ja nur dem termin der erstellt wird, auch in die db geschrieben werden
         // 2) Persistenz: versuche, den Termin in die DB zu schreiben (robust / optional)
         try (Connection conn = Database.getConnection()) {
             conn.setAutoCommit(false);
@@ -488,7 +483,6 @@ public class MainLogik {
         }
     }
 
-    // @Luis kein Plan was hier passiert, aber schreibt die Demo-Daten in die DB, falls behalten, verhindern, dass demos bei jedem Start neu reingeschrieben werden
     // Schreibt die Demo-Daten in die Datenbank
     private static void persistDemosToDB() {
         try (Connection conn = Database.getConnection()) {
@@ -708,8 +702,6 @@ public class MainLogik {
         }
     }
 
-    /* @Luis: Die Methode ist eigentlich unnötig, da die Rolle schon beim Anlegen des Benutzers bereinigt wird.
-    Rollen haben wir jetzt eh nicht richtig umgesetzt, also können die auch in die datenbank geschrieben werden wie sie sind. */
     // Hilfsmethode zur Normalisierung von Rollen für DB-Insert (nur ADMIN oder KIND zulassen)
     private static String sanitizeRole(String rolle) {
         if (rolle == null) return "Kind";
