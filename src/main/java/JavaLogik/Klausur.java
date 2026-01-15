@@ -14,7 +14,6 @@ public class Klausur {
     public static void main(String[] args) {
 
         // Fehlerbehandlung in unserem Projekt:
-
         // Fehlerbehandlung in der Logik (try–catch)
         try {
             Familie fam = Demos.getDemoFamilie();
@@ -49,7 +48,6 @@ public class Klausur {
                 );
             }
         }
-        //--------------------------------------------------------------------------------
 
         // Drei Schichten Modell / Verteilung:
 
@@ -70,30 +68,6 @@ public class Klausur {
         }
         // düfte nicht drinnen sein, sondern sollte methode in datenbankklasse sein
 
-        //------------------------------------------------------------------------------------
-
-        // Datenbankanbindung:
-        /* Das Projekt wurde als Maven-Projekt in IntelliJ angelegt.
-        Über die pom.xml haben wir den MySQL-JDBC-Treiber als Dependency eingebunden.
-        Über eine JDBC-URL verbindet sich das Java-Programm dann mit der lokal laufenden MySQL-Datenbank.
-        Die Verbindungsdaten sind in einer eigenen Klasse zentral hinterlegt.
-        oder kürzer:
-        Wir haben Maven genutzt, um den MySQL-JDBC-Treiber einzubinden,
-        und stellen über eine JDBC-URL eine Verbindung zu einer lokalen MySQL-Datenbank her  */
-
-        // pom.xml Ausschnitt:
-            <dependency>
-                <groupId>com.mysql</groupId>
-                <artifactId>mysql-connector-j</artifactId>
-                <version>8.2.0</version>
-            </dependency>
-
-        // Database.java Ausschnitt:
-        private static final String URL =
-                "jdbc:mysql://localhost:3306/Terminkalender?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
-
-        //------------------------------------------------------------------------------------
-
         // ActionListeners in der GUI:
         // verbindet GUI-Elemente mit Logik, also was nach Aktionen passieren soll
 
@@ -101,8 +75,6 @@ public class Klausur {
             currentMonth = LocalDate.now().withDayOfMonth(1);   // Java Code
             showMonthView();
         });
-
-        //------------------------------------------------------------------------------------
 
         // Collections im Projekt:
 
