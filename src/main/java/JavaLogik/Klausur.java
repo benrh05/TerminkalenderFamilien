@@ -34,6 +34,21 @@ public class Klausur {
             new Alert(Alert.AlertType.ERROR,
                     "Termin konnte nicht gelöscht werden.").showAndWait();
         }
+
+        // wäre vllt auch sinnvoll gewesen:
+        public class TerminKonfliktException extends Exception {
+            public TerminKonfliktException(String message) {
+                super(message);
+            }
+        }
+        public static void terminHinzufuegen(Termin neu)
+            throws TerminKonfliktException {
+            if (hatKonflikt(neu)) {
+                throw new TerminKonfliktException(
+                        "Der Termin überschneidet sich mit einem bestehenden Termin."
+                );
+            }
+        }
         //--------------------------------------------------------------------------------
 
         // Drei Schichten Modell / Verteilung:
@@ -41,7 +56,7 @@ public class Klausur {
         /* Im Projekt wurde kein striktes Drei-Schichten-Modell umgesetzt.
         Aufgrund der überschaubaren Anzahl an SQL-Statements und der geringen Komplexität der Datenbankzugriffe
         wurde auf eigene Datenbankklassen verzichtet.
-        Stattdessen erfolgt der Datenzugriff zentral in der Geschäftslogik,
+        Stattdessen erfolgt der Datenzugriff zentral in der Mainlogik,
         wodurch zusätzliche Abstraktionsklassen vermieden und die Verständlichkeit des Codes erhöht wurde. */
         try (Connection conn = Database.getConnection();
              PreparedStatement ps = conn.prepareStatement(
@@ -60,7 +75,6 @@ public class Klausur {
         // Datenbankanbindung:
         /* Das Projekt wurde als Maven-Projekt in IntelliJ angelegt.
         Über die pom.xml haben wir den MySQL-JDBC-Treiber als Dependency eingebunden.
-        Maven lädt diesen Treiber automatisch und stellt ihn dem Projekt zur Verfügung.
         Über eine JDBC-URL verbindet sich das Java-Programm dann mit der lokal laufenden MySQL-Datenbank.
         Die Verbindungsdaten sind in einer eigenen Klasse zentral hinterlegt.
         oder kürzer:
@@ -83,7 +97,7 @@ public class Klausur {
         // ActionListeners in der GUI:
         // verbindet GUI-Elemente mit Logik, also was nach Aktionen passieren soll
 
-        heuteBtn.setOnAction(e -> {    // Listener für "Heute"-Button
+        heuteBtn.setOnAction(e -> {    // Listener für "Heute"-Button. e = Event Objekt
             currentMonth = LocalDate.now().withDayOfMonth(1);   // Java Code
             showMonthView();
         });
@@ -99,5 +113,9 @@ public class Klausur {
         // HashSet damit Benachrichtigungen nur einmal angezeigt werden
         private final Set<String> shownNotifications = new HashSet<>();
         // Warum genutzt? Schnelle Suche, keine Duplikate
+
+        // Hätten auch sowas nutzen können:
+        Map<LocalDate, List<Termin>> termineProTag = new HashMap<>();
+        // HashMap, um Termine nach Datum zu gruppieren -> schneller Zugriff auf Termine eines bestimmten Tages
     }
 }
